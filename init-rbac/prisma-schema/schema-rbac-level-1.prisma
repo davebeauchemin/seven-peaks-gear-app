@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Role {
+  id          String           @id @default(dbgenerated("gen_random_uuid()"))
+  name        String           @unique
+  description String?
+  createdAt   DateTime?        @default(now()) @map("created_at")
+  updatedAt   DateTime?        @updatedAt @map("updated_at")
+  permissions RolePermission[] @relation("RoleToPermission")
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(dbgenerated("gen_random_uuid()"))
+  name        String           @unique
+  description String?
+  createdAt   DateTime?        @default(now()) @map("created_at")
+  updatedAt   DateTime?        @updatedAt @map("updated_at")
+  roles       RolePermission[] @relation("PermissionToRole")
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(dbgenerated("gen_random_uuid()"))
+  roleId       String     @map("role_id")
+  role         Role       @relation("RoleToPermission", fields: [roleId], references: [id])
+  permissionId String     @map("permission_id")
+  permission   Permission @relation("PermissionToRole", fields: [permissionId], references: [id])
+  description  String?
+  createdAt    DateTime?  @default(now()) @map("created_at")
+  updatedAt    DateTime?  @updatedAt @map("updated_at")
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()"))
+  userId             String     @unique @map("user_id")
+  surecartCustomerId String?    @unique @map("surecart_customer_id")
+  fullName           String?    @map("full_name")
+  email              String     @unique
+  phone              String?
+  createdAt          DateTime?  @default(now()) @map("created_at")
+  updatedAt          DateTime?  @updatedAt @map("updated_at")
+  firstName          String?
+  lastName           String?
+  role               UserRole?  @relation("userRole")
+  metadatas          Metadata[]
+
+  @@index([phone])
+  @@index([userId])
+  @@map("users")
+}
+
+model UserRole {
+  id        String    @id @default(dbgenerated("gen_random_uuid()"))
+  userId    String    @unique @map("user_id")
+  user      User      @relation("userRole", fields: [userId], references: [id])
+  role      String
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  @@unique([userId, role])
+  @@map("user_roles")
+}
+
+model Organization {
+  id             String     @id @default(dbgenerated("gen_random_uuid()"))
+  name           String     @unique
+  legalName      String     @unique @map("legal_name")
+  businessNumber String?    @unique @map("business_number")
+  website        String?
+  phone          String?
+  email          String?
+  createdAt      DateTime?  @default(now()) @map("created_at")
+  updatedAt      DateTime?  @updatedAt @map("updated_at")
+  addressId      String?    @unique @map("address_id")
+  address        Address?
+  metadatas      Metadata[]
+
+  @@index([email])
+  @@index([phone])
+  @@map("organizations")
+}
+
+model Metadata {
+  id              String        @id @default(dbgenerated("gen_random_uuid()"))
+  entityId        String        @map("entity_id")
+  entityType      String        @map("entity_type")
+  key             String
+  value           String
+  createdAt       DateTime?     @default(now()) @map("created_at")
+  updatedAt       DateTime?     @updatedAt @map("updated_at")
+  userId          String?       @map("user_id")
+  organizationsId String?       @map("organizations_id")
+  addressId       String?
+  user            User?         @relation(fields: [userId], references: [id])
+  organizations   Organization? @relation(fields: [organizationsId], references: [id])
+  address         Address?      @relation(fields: [addressId], references: [id])
+
+  @@index([entityId])
+  @@index([entityType])
+  @@index([key])
+  @@index([value])
+  @@map("metadatas")
+}
+
+model Address {
+  id             String        @id @default(dbgenerated("gen_random_uuid()"))
+  type           AddressType   @default(PHYSICAL)
+  city           String
+  state          String?
+  zipCode        String?       @map("zip_code")
+  country        String
+  createdAt      DateTime?     @default(now()) @map("created_at")
+  updatedAt      DateTime?     @updatedAt @map("updated_at")
+  addressLine1   String        @map("address_line1")
+  addressLine2   String?       @map("address_line2")
+  organizationId String?       @unique @map("organization_id")
+  postalCode     String?       @map("postal_code")
+  province       String?
+  fullAddress    String?       @map("full_address")
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  metadatas      Metadata[]
+
+  @@map("addresses")
+}
+
+enum AddressType {
+  BILLING
+  PHYSICAL
+  SHIPPING
+  ORGANIZATION
+}
