@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Base URL and API key for SureCart API
  */
-const SURECART_BACKOFFICE_URL = process.env.SURECART_BACKOFFICE_URL || "";
+const SURECART_API_URL = process.env.SURECART_API_URL || "";
 const SURECART_API_KEY = process.env.SURECART_API_KEY || "";
 
 /**
@@ -39,7 +39,7 @@ export const fetchFromSureCart = async <T>({
   body,
 }: SureCartApiParams): Promise<T> => {
   // Build URL with query parameters
-  const url = new URL(`${SURECART_BACKOFFICE_URL}/api/v1/${endpoint}`);
+  const url = new URL(`${SURECART_API_URL}/v1/${endpoint}`);
 
   // Add query parameters if they exist
   Object.entries(query).forEach(([key, value]) => {
