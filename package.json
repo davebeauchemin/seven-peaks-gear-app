@@ -10,9 +10,9 @@
     "init-level-two": "rm -rf prisma/migrations && cp ./init-rbac/prisma-schema/schema-rbac-level-2.prisma ./prisma/schema.prisma && cp ./init-rbac/auth-utils/auth-level-2.ts ./lib/auth.ts && npx prisma migrate reset --force --skip-seed && npx prisma migrate dev --name init-level-two && npm run seed -- level-two && npm run policy-level-two && echo 'Level two setup complete. Run npm run dev separately.'",
     "policy-level-one": "dotenv -e .env -- psql -f ./baas/supabase/sql/init-level-one.sql",
     "policy-level-two": "dotenv -e .env -- psql -f ./baas/supabase/sql/init-level-two.sql",
-    "init:app": "cd ./baas/ && supabase start && cd .. && npm run dev",
-    "init:server": "cd ./baas/ && supabase start && cd ..",
-    "stop:server": "cd ./baas/ && supabase stop && cd .."
+    "app": "cd ./baas/ && supabase start && cd .. && npm run dev",
+    "server:start": "cd ./baas/ && supabase start && cd ..",
+    "server:stop": "cd ./baas/ && supabase stop && cd .."
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
