@@ -1,10 +1,8 @@
 import { fetchCSVData } from "@/lib/csv-helpers";
 import { CollectionCSVItem } from "@/app/api/sync-product/route";
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createProductCollection,
-  SureCartProductCollection,
-} from "@/lib/surecart/surecart-helpers";
+import { SureCartProductCollection } from "@/types";
+import { createProductCollection } from "@/lib/surecart/surecart-collections";
 
 export async function GET(request: NextRequest) {
   console.log("Step 1: Fetching collections data from CSV...");

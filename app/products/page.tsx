@@ -1,12 +1,5 @@
-import {
-  fetchFromSureCart,
-  getProducts,
-} from "@/lib/surecart/surecart-helpers";
-
 export default async function ProductsPage() {
-  const products = await getProducts();
-
-  console.log(products);
+  // console.log(products);
 
   return <div>Products</div>;
 }

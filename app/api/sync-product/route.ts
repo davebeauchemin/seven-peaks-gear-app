@@ -1,22 +1,20 @@
 import { fetchCSVData } from "@/lib/csv-helpers";
+import { NextRequest, NextResponse } from "next/server";
+import { createSureCartMedia } from "@/lib/surecart/surecart-core-modules";
+import { ProductCSVItem, SureCartProductCollectionResponse } from "@/types";
 import {
   createSureCartProduct,
   createSureCartProductPrice,
-  deleteAllProducts,
+  deleteAllSureCartProducts,
   deleteAllProductVariants,
   formatProductsForSureCart,
-  isValidImageUrl,
-  ProductCSVItem,
-  getSureCartHappyFilesId,
+} from "@/lib/surecart/surecart-products";
+import {
   createProductCollection,
   getProductCollections,
-  SureCartProductCollectionResponse,
-} from "@/lib/surecart/surecart-helpers";
-import { NextRequest, NextResponse } from "next/server";
-import {
-  createSureCartMedia,
-  createSureCartProductMedia,
-} from "@/lib/surecart/surecart-core-modules";
+} from "@/lib/surecart/surecart-collections";
+import { getSureCartHappyFilesId } from "@/lib/surecart/surecart-media";
+import { isValidImageUrl } from "@/lib/media-utility";
 
 // Collection item type from CSV
 export interface CollectionCSVItem {
@@ -45,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // First delete all existing products, media, and variants
     console.log("Deleting existing data...");
-    await deleteAllProducts();
+    await deleteAllSureCartProducts();
     await deleteAllProductVariants();
     console.log("Existing data deleted successfully");
 
@@ -536,7 +534,7 @@ async function fetchAllExistingMedia(): Promise<
 }
 
 export async function DELETE(req: NextRequest) {
-  await deleteAllProducts();
+  await deleteAllSureCartProducts();
   await deleteAllProductVariants();
   return NextResponse.json({ success: true, message: "Products deleted" });
 }

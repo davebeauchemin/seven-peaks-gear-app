@@ -1,10 +1,10 @@
 import { fetchCSVData } from "@/lib/csv-helpers";
 import {
   createProductCollection,
-  getProductCollections,
-  SureCartProductCollectionResponse,
   deleteProductCollection,
-} from "@/lib/surecart/surecart-helpers";
+  getProductCollections,
+} from "@/lib/surecart/surecart-collections";
+import { SureCartProductCollectionResponse } from "@/types";
 import { NextRequest, NextResponse } from "next/server";
 
 // Collection item type from CSV
