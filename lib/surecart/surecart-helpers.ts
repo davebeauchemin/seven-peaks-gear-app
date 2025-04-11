@@ -205,12 +205,12 @@ export async function deleteAllProductVariants() {
 
     console.log(`Total product variants to delete: ${allVariantIds.length}`);
 
-    // Process deletion in batches of 10 with 2-second delay between batches
+    // Process deletion in batches of 20 with 3-second delay between batches
     let successCount = 0;
     let failureCount = 0;
-    const batchSize = 10;
+    const batchSize = 20;
 
-    // Split into batches of 10
+    // Split into batches of 20
     for (let i = 0; i < allVariantIds.length; i += batchSize) {
       const batch = allVariantIds.slice(i, i + batchSize);
       console.log(
@@ -250,10 +250,10 @@ export async function deleteAllProductVariants() {
         `Batch complete: ${batchSuccesses}/${batch.length} successful. Overall progress: ${i + batch.length}/${allVariantIds.length}`
       );
 
-      // Wait 2 seconds before processing the next batch
+      // Wait 3 seconds before processing the next batch
       if (i + batchSize < allVariantIds.length) {
-        console.log("Waiting 2 seconds before next batch...");
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        console.log("Waiting 3 seconds before next batch...");
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
 
@@ -705,4 +705,104 @@ export async function createSureCartProductPrice(
 
   console.log(`Created price with ID: ${price.id}`);
   return price;
+}
+
+export type SureCartProductCollectionResponse = {
+  id: string;
+  object: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  slug: string;
+  description?: string;
+  position?: number;
+  metadata?: {
+    parent_collection?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+};
+
+export type SureCartProductCollection = {
+  name: string;
+  slug?: string;
+  description?: string;
+  position?: number;
+  metadata?: {
+    parent_collection?: string;
+    [key: string]: any;
+  };
+};
+
+/**
+ * Creates a product collection in SureCart
+ * @param collection The collection data to create
+ * @returns The created collection
+ */
+export async function createProductCollection(
+  collection: SureCartProductCollection
+): Promise<SureCartProductCollectionResponse> {
+  console.log("Creating product collection:", collection.name);
+
+  const createdCollection =
+    await fetchSureCart<SureCartProductCollectionResponse>({
+      endpoint: "product_collections",
+      method: "POST",
+      body: { product_collection: collection },
+    });
+
+  return createdCollection;
+}
+
+/**
+ * Updates an existing product collection in SureCart
+ * @param id The ID of the collection to update
+ * @param collection The collection data to update
+ * @returns The updated collection
+ */
+export async function updateProductCollection(
+  id: string,
+  collection: Partial<SureCartProductCollection>
+): Promise<SureCartProductCollectionResponse> {
+  console.log("Updating product collection:", collection.name || id);
+
+  const updatedCollection =
+    await fetchSureCart<SureCartProductCollectionResponse>({
+      endpoint: `product_collections/${id}`,
+      method: "PATCH",
+      body: { product_collection: collection },
+    });
+
+  return updatedCollection;
+}
+
+/**
+ * Gets all product collections from SureCart
+ * @param query Optional query parameters
+ * @returns List of product collections
+ */
+export async function getProductCollections(
+  query: Record<string, string | number | boolean | undefined> = {}
+): Promise<{ data: SureCartProductCollectionResponse[] }> {
+  return fetchSureCart<{ data: SureCartProductCollectionResponse[] }>({
+    endpoint: "product_collections",
+    method: "GET",
+    query,
+  });
+}
+
+/**
+ * Deletes a product collection from SureCart
+ * @param id The ID of the collection to delete
+ * @returns The deletion response
+ */
+export async function deleteProductCollection(
+  id: string
+): Promise<{ id: string; object: string; deleted: boolean }> {
+  console.log("Deleting product collection:", id);
+
+  return fetchSureCart<{ id: string; object: string; deleted: boolean }>({
+    endpoint: `product_collections/${id}`,
+    method: "DELETE",
+  });
 }

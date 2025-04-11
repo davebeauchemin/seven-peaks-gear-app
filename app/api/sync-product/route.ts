@@ -8,12 +8,36 @@ import {
   isValidImageUrl,
   ProductCSVItem,
   getSureCartHappyFilesId,
+  createProductCollection,
+  getProductCollections,
+  SureCartProductCollectionResponse,
 } from "@/lib/surecart/surecart-helpers";
 import { NextRequest, NextResponse } from "next/server";
 import {
   createSureCartMedia,
   createSureCartProductMedia,
 } from "@/lib/surecart/surecart-core-modules";
+
+// Collection item type from CSV
+export interface CollectionCSVItem {
+  "": string;
+  Slug: string;
+  Command: string;
+  Title: string;
+  "Metafield: custom.parent_collection_id [single_line_text_field]": string;
+  "Metafield: custom.sub_collection_ids [list.single_line_text_field]": string;
+  "Body HTML": string;
+  "Sort Order": string;
+  "Template Suffix": string;
+  "Updated At": string;
+  Published: string;
+  "Published At": string;
+  "Published Scope": string;
+  "Row #": string;
+  "Top Row": string;
+  "Image Src": string;
+  "Metafield: field_key": string;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +49,8 @@ export async function POST(req: NextRequest) {
     await deleteAllProductVariants();
     console.log("Existing data deleted successfully");
 
+    // STEP 1: Fetch and process product data
+    console.log("Step 1: Fetching and processing product data...");
     const productData = (await fetchCSVData(
       process.env.PRODUCTS_FILE_URL!
     )) as ProductCSVItem[];
@@ -32,16 +58,29 @@ export async function POST(req: NextRequest) {
     // Format the products for SureCart
     const formattedProducts = formatProductsForSureCart(productData);
 
-    // STEP 1: Get all existing media in the SureCart HappyFiles folder
-    console.log("Step 1: Fetching all existing media in SureCart folder...");
+    // Get existing collections to map products to collections
+    console.log("Fetching existing collections for product association...");
+    const { data: existingCollections } = await getProductCollections();
+    const collectionsMap = new Map<string, SureCartProductCollectionResponse>();
+
+    existingCollections.forEach((collection) => {
+      collectionsMap.set(collection.slug, collection);
+    });
+
+    console.log(
+      `Found ${existingCollections.length} existing collections for product mapping`
+    );
+
+    // STEP 2: Get all existing media in the SureCart HappyFiles folder
+    console.log("Step 2: Fetching all existing media in SureCart folder...");
     const existingMediaMap = await fetchAllExistingMedia();
     console.log(
       `Found ${existingMediaMap.size} existing media items in SureCart folder`
     );
 
-    // STEP 2: Collect all unique image URLs needed across all products
+    // STEP 3: Collect all unique image URLs needed across all products
     console.log(
-      "Step 2: Collecting all unique image URLs across all products..."
+      "Step 3: Collecting all unique image URLs across all products..."
     );
     const allImageUrls = new Set<string>();
     const productImageData: Array<{
@@ -69,8 +108,8 @@ export async function POST(req: NextRequest) {
       `Found ${allImageUrls.size} unique images to process across all products`
     );
 
-    // STEP 3: Determine which images need to be uploaded (not in existing media)
-    console.log("Step 3: Determining which images need to be uploaded...");
+    // STEP 4: Determine which images need to be uploaded (not in existing media)
+    console.log("Step 4: Determining which images need to be uploaded...");
     const imageUrlsToUpload: string[] = [];
     const imageUrlToMediaData = new Map<
       string,
@@ -94,9 +133,9 @@ export async function POST(req: NextRequest) {
       `${imageUrlsToUpload.length} images need to be uploaded, ${allImageUrls.size - imageUrlsToUpload.length} already exist`
     );
 
-    // STEP 4: Upload all new images in parallel
+    // STEP 5: Upload all new images in parallel
     if (imageUrlsToUpload.length > 0) {
-      console.log("Step 4: Uploading new images in parallel...");
+      console.log("Step 5: Uploading new images in parallel...");
 
       // Create upload tasks for all new images
       const uploadTasks = imageUrlsToUpload.map(async (imageUrl) => {
@@ -142,11 +181,13 @@ export async function POST(req: NextRequest) {
         `Completed ${successCount}/${imageUrlsToUpload.length} image uploads`
       );
     } else {
-      console.log("Step 4: No new images to upload, skipping upload step");
+      console.log("Step 5: No new images to upload, skipping upload step");
     }
 
-    // STEP 5: Now process all products with the prepared images
-    console.log("Step 5: Creating products with processed images...");
+    // STEP 6: Now process all products with the prepared images and collection assignments
+    console.log(
+      "Step 6: Creating products with processed images and collection assignments..."
+    );
     const productCreationResults = [];
 
     for (const { product, variantsWithImages } of productImageData) {
@@ -230,6 +271,88 @@ export async function POST(req: NextRequest) {
         console.log(
           `Added ${galleryImageIds.length} images to product gallery`
         );
+      }
+
+      // Find the product's category slug from the original data
+      const originalProductData = productData.find(
+        (p) => p.Handle === product.slug || p.Title === product.name
+      );
+
+      if (originalProductData && originalProductData["Category - Slug"]) {
+        const categorySlug = originalProductData["Category - Slug"];
+        const categoryName =
+          originalProductData["Category - Name"] || categorySlug;
+
+        // Check if we have this collection in our map by slug
+        let collection = collectionsMap.get(categorySlug);
+
+        if (!collection) {
+          // Check if a collection with the same name already exists
+          const existingCollectionWithSameName = Array.from(
+            collectionsMap.values()
+          ).find((c) => c.name.toLowerCase() === categoryName.toLowerCase());
+
+          if (existingCollectionWithSameName) {
+            // Use the existing collection with the same name
+            collection = existingCollectionWithSameName;
+            console.log(
+              `Found collection with same name for ${categoryName}. Using existing collection: ${collection.name} (${collection.slug})`
+            );
+          } else {
+            // If collection not found, attempt to create it and then assign
+            console.log(
+              `Collection not found for ${categorySlug}, creating it now...`
+            );
+            try {
+              const newCollection = await createProductCollection({
+                name: categoryName,
+                slug: categorySlug,
+                description: `Products in the ${categoryName} category`,
+              });
+
+              // Add the new collection to our map
+              collectionsMap.set(categorySlug, newCollection);
+              collection = newCollection;
+
+              console.log(
+                `Created new collection: ${newCollection.name} (${categorySlug})`
+              );
+            } catch (collectionError: any) {
+              console.error(
+                `Failed to create collection for ${categorySlug}:`,
+                collectionError.message
+              );
+
+              // If creation failed, try to find an existing collection with this name
+              console.log(
+                `Attempting to find existing collection with name: ${categoryName}`
+              );
+              const { data: nameMatchCollections } =
+                await getProductCollections({
+                  search: categoryName,
+                });
+
+              if (nameMatchCollections && nameMatchCollections.length > 0) {
+                // Use the first matching collection
+                collection = nameMatchCollections[0];
+                // Add to our map for future use
+                collectionsMap.set(categorySlug, collection);
+                console.log(
+                  `Using existing collection: ${collection.name} (${collection.slug})`
+                );
+              }
+            }
+          }
+        }
+
+        // If we have a collection (either found or created), assign it to the product
+        if (collection) {
+          // Add collection ID directly to product_collections field instead of metadata
+          product.product_collections = [collection.id];
+          console.log(
+            `Assigned product ${product.name} to collection ${collection.name} (${collection.slug})`
+          );
+        }
       }
 
       try {
