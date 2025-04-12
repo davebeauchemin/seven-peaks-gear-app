@@ -1,8 +1,8 @@
+import { fetchSureCart } from "./surecart-helpers";
 import {
-  fetchSureCart,
-  checkExistingMediaByFilename,
+  checkExistingWPMediaByFilename,
   getSureCartHappyFilesId,
-} from "./surecart-helpers";
+} from "./surecart-media";
 
 export type SureCartMediaResponse = {
   id: string;
@@ -37,7 +37,7 @@ export async function createSureCartMedia(media: {
 
     // Check if an image with this filename already exists
     // This will throw an error if the SureCart HappyFiles category doesn't exist
-    const existingMedia = await checkExistingMediaByFilename(fileName);
+    const existingMedia = await checkExistingWPMediaByFilename(fileName);
     if (existingMedia) {
       console.log(
         `Using existing media with ID: ${existingMedia.id} for file: ${fileName}`

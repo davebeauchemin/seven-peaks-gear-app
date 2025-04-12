@@ -29,7 +29,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/20 z-10" />
         <div className="relative h-[70vh] w-full">
           <Image
-            src="/placeholder.svg?height=1080&width=1920"
+            src="/placeholder.png?height=1080&width=1920"
             alt="Mountain biker riding through a forest trail"
             fill
             className="object-cover"
@@ -82,21 +82,21 @@ export default function Home() {
               name="Alpine X3"
               category="Mountain Bike"
               price={2499}
-              image="/placeholder.svg?height=600&width=600"
+              image="/placeholder.png?height=600&width=600"
               badge="New"
             />
             <ProductCard
               name="Velocity Pro"
               category="Road Bike"
               price={1899}
-              image="/placeholder.svg?height=600&width=600"
+              image="/placeholder.png?height=600&width=600"
               badge="Best Seller"
             />
             <ProductCard
               name="Summit E-Trail"
               category="Electric Bike"
               price={3299}
-              image="/placeholder.svg?height=600&width=600"
+              image="/placeholder.png?height=600&width=600"
             />
           </div>
         </div>
@@ -111,17 +111,17 @@ export default function Home() {
             <CategoryCard
               title="Mountain Bikes"
               description="Engineered for rough terrain and thrilling descents"
-              image="/placeholder.svg?height=600&width=600"
+              image="/placeholder.png?height=600&width=600"
             />
             <CategoryCard
               title="Road Bikes"
               description="Built for speed, efficiency, and long-distance comfort"
-              image="/placeholder.svg?height=600&width=600"
+              image="/placeholder.png?height=600&width=600"
             />
             <CategoryCard
               title="Electric Bikes"
               description="Power-assisted rides for extended adventures"
-              image="/placeholder.svg?height=600&width=600"
+              image="/placeholder.png?height=600&width=600"
             />
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function Home() {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <Image
-                src="/placeholder.svg?height=800&width=800"
+                src="/placeholder.png?height=800&width=800"
                 alt="Bike manufacturing"
                 width={600}
                 height={600}
@@ -153,7 +153,7 @@ export default function Home() {
                 <li className="flex items-start gap-2">
                   <div className="rounded-full bg-primary/10 p-1">
                     <svg
-                      xmlns="http://www.w3.org/2000/svg"
+                      xmlns="http://www.w3.org/2000/png"
                       width="16"
                       height="16"
                       viewBox="0 0 24 24"
@@ -172,7 +172,7 @@ export default function Home() {
                 <li className="flex items-start gap-2">
                   <div className="rounded-full bg-primary/10 p-1">
                     <svg
-                      xmlns="http://www.w3.org/2000/svg"
+                      xmlns="http://www.w3.org/2000/png"
                       width="16"
                       height="16"
                       viewBox="0 0 24 24"
@@ -191,7 +191,7 @@ export default function Home() {
                 <li className="flex items-start gap-2">
                   <div className="rounded-full bg-primary/10 p-1">
                     <svg
-                      xmlns="http://www.w3.org/2000/svg"
+                      xmlns="http://www.w3.org/2000/png"
                       width="16"
                       height="16"
                       viewBox="0 0 24 24"
@@ -289,7 +289,7 @@ function ProductCard({
       )}
       <div className="aspect-square overflow-hidden">
         <Image
-          src={image || "/placeholder.svg"}
+          src={image || "/placeholder.png"}
           alt={name}
           width={400}
           height={400}
@@ -320,7 +320,7 @@ function CategoryCard({ title, description, image }: CategoryCardProps) {
     <div className="group relative overflow-hidden rounded-lg">
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/0 z-10" />
       <Image
-        src={image || "/placeholder.svg"}
+        src={image || "/placeholder.png"}
         alt={title}
         width={600}
         height={400}

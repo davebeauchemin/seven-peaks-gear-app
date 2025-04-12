@@ -1,15 +1,8 @@
-import DeployButton from "@/components/nextjs/deploy-button";
-import { EnvVarWarning } from "@/components/nextjs/env-var-warning";
-import HeaderAuth from "@/components/nextjs/header-auth";
-import { ThemeSwitcher } from "@/components/nextjs/theme-switcher";
-import { hasEnvVars } from "@/utils/supabase/check-env-vars";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-import Link from "next/link";
 import "./globals.css";
 import { MainHeader } from "@/components/header/main-header";
 import { MainFooter } from "@/components/footer/main-footer";
-import { MediaProvider } from "@/context/media-context";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -40,11 +33,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <MediaProvider>
-            <MainHeader />
-            {children}
-            <MainFooter />
-          </MediaProvider>
+          <MainHeader />
+          {children}
+          <MainFooter />
         </ThemeProvider>
       </body>
     </html>
