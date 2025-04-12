@@ -1,0 +1,17 @@
+<svg width="100%" height="100%" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#f0f0f0"/>
+  <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#ff0000" x="340" y="340">
+    <path d="m8 3 4 8 5-5 5 15H2L8 3z" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <text x="400" y="300" font-family="system-ui, sans-serif" font-size="24" text-anchor="middle" fill="#666">Seven Peaks Gear</text>
+  <text id="dimensions" x="400" y="500" font-family="system-ui, sans-serif" font-size="18" text-anchor="middle" fill="#888"></text>
+  <script type="text/javascript">
+    <![CDATA[
+      const url = new URL(window.location.href);
+      const width = url.searchParams.get('width') || 800;
+      const height = url.searchParams.get('height') || 800;
+      const dimensionsText = document.getElementById('dimensions');
+      dimensionsText.textContent = width + ' × ' + height;
+    ]]>
+  </script>
+</svg> 

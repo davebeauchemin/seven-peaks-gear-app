@@ -1,7 +1,5 @@
-/**
- * Fetch the HappyFiles category ID for SureCart
- * This uses a cache to avoid repeated API calls
- */
+"use server";
+
 let sureCartHappyFilesId: number | null = null;
 
 export async function getSureCartHappyFilesId(): Promise<number> {
@@ -57,11 +55,6 @@ export async function getSureCartHappyFilesId(): Promise<number> {
   }
 }
 
-/**
- * Check if an image with the same filename already exists in the SureCart HappyFiles category
- * @param filename The filename to check
- * @returns The existing media object if found, null otherwise
- */
 export async function checkExistingWPMediaByFilename(
   filename: string
 ): Promise<{ id: number; source_url: string } | null> {

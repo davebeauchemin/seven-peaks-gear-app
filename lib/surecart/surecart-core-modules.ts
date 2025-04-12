@@ -1,3 +1,5 @@
+"use server";
+
 import { fetchSureCart } from "./surecart-helpers";
 import {
   checkExistingWPMediaByFilename,

@@ -8,6 +8,75 @@ import {
   SureCartProduct,
 } from "../../types";
 
+export async function getSureCartProducts({
+  archived = false,
+  featured = false,
+  limit = 100,
+  page = 1,
+  productCollectionIds = [],
+  productGroupIds = [],
+  query = "",
+  status = [],
+  sort = "",
+  expand = [],
+}: {
+  archived?: boolean;
+  featured?: boolean;
+  limit?: number;
+  page?: number;
+  productCollectionIds?: string[];
+  productGroupIds?: string[];
+  query?: string;
+  status?: string[];
+  sort?: string;
+  expand?: string[];
+} = {}) {
+  try {
+    const queryParams: Record<string, any> = {
+      archived,
+      featured,
+      limit: Math.min(Math.max(1, limit), 100), // Ensure limit is between 1 and 100
+      page,
+    };
+
+    // Add optional filters only if they have values
+    if (productCollectionIds.length > 0) {
+      queryParams["product_collection_ids[]"] = productCollectionIds;
+    }
+
+    if (productGroupIds.length > 0) {
+      queryParams["product_group_ids[]"] = productGroupIds;
+    }
+
+    if (query) {
+      queryParams.query = query;
+    }
+
+    if (status.length > 0) {
+      queryParams["status[]"] = status;
+    }
+
+    if (sort) {
+      queryParams.sort = sort;
+    }
+
+    if (expand.length > 0) {
+      queryParams["expand[]"] = expand;
+    }
+
+    const response = await fetchSureCart({
+      endpoint: "products",
+      method: "GET",
+      query: queryParams,
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error fetching SureCart products:", error);
+    throw error;
+  }
+}
+
 export async function createSureCartProduct(
   product: any
 ): Promise<SureCartProductResponse> {
@@ -168,12 +237,6 @@ export async function deleteAllProductVariants() {
   }
 }
 
-/**
- * Combined function to delete all product data in sequence:
- * 1. Delete all products
- * 2. Delete all product variants
- * 3. Delete all product media (SureCart product media items)
- */
 export async function deleteAllProductData() {
   console.log("Starting complete product data deletion process...");
 
@@ -263,75 +326,6 @@ export async function createSureCartProductPrice(
   return price;
 }
 
-/**
- * Get products from SureCart with optional filtering
- */
-export async function getSureCartProducts({
-  archived = false,
-  featured = false,
-  limit = 100,
-  page = 1,
-  productCollectionIds = [],
-  productGroupIds = [],
-  query = "",
-  status = [],
-  sort = "",
-}: {
-  archived?: boolean;
-  featured?: boolean;
-  limit?: number;
-  page?: number;
-  productCollectionIds?: string[];
-  productGroupIds?: string[];
-  query?: string;
-  status?: string[];
-  sort?: string;
-} = {}) {
-  try {
-    const queryParams: Record<string, any> = {
-      archived,
-      featured,
-      limit: Math.min(Math.max(1, limit), 100), // Ensure limit is between 1 and 100
-      page,
-    };
-
-    // Add optional filters only if they have values
-    if (productCollectionIds.length > 0) {
-      queryParams["product_collection_ids[]"] = productCollectionIds;
-    }
-
-    if (productGroupIds.length > 0) {
-      queryParams["product_group_ids[]"] = productGroupIds;
-    }
-
-    if (query) {
-      queryParams.query = query;
-    }
-
-    if (status.length > 0) {
-      queryParams["status[]"] = status;
-    }
-
-    if (sort) {
-      queryParams.sort = sort;
-    }
-
-    const response = await fetchSureCart({
-      endpoint: "products",
-      method: "GET",
-      query: queryParams,
-    });
-
-    return response;
-  } catch (error) {
-    console.error("Error fetching SureCart products:", error);
-    throw error;
-  }
-}
-
-/**
- * Format CSV product data to SureCart format
- */
 export function formatProductsForSureCart(
   productData: ProductCSVItem[]
 ): SureCartProduct[] {

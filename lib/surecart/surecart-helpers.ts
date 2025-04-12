@@ -1,12 +1,6 @@
-import {
-  ProductCSVItem,
-  SureCartApiError,
-  SureCartApiParams,
-  SureCartMetadata,
-  SureCartProduct,
-  SureCartVariant,
-  SureCartVariantOption,
-} from "../../types";
+"use server";
+
+import { SureCartApiError, SureCartApiParams } from "../../types";
 
 /**
  * Base URL and API key for SureCart API
