@@ -4,19 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { SureCartProductCollection } from "@/types";
 import { createProductCollection } from "@/lib/surecart/surecart-collections";
 
-export async function GET(request: NextRequest) {
-  console.log("Step 1: Fetching collections data from CSV...");
-  const collectionsUrl =
-    process.env.COLLECTIONS_FILE_URL ||
-    "https://docs.google.com/spreadsheets/d/1pMQWoWuj7sUHqe0kBmj3-yfzxGm3d7xkWuHoIRzQ32Y/export?format=csv&gid=1474997038";
-  const collectionsData = (await fetchCSVData(
-    collectionsUrl
-  )) as CollectionCSVItem[];
-
-  console.log("Collections data:", collectionsData);
-  return NextResponse.json({ collections: collectionsData });
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
