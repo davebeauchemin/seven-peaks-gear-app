@@ -9,6 +9,7 @@ import Link from "next/link";
 import "./globals.css";
 import { MainHeader } from "@/components/header/main-header";
 import { MainFooter } from "@/components/footer/main-footer";
+import { MediaProvider } from "@/context/media-context";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -39,9 +40,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <MainHeader />
-          {children}
-          <MainFooter />
+          <MediaProvider>
+            <MainHeader />
+            {children}
+            <MainFooter />
+          </MediaProvider>
         </ThemeProvider>
       </body>
     </html>
