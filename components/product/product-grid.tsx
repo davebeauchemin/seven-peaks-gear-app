@@ -106,6 +106,7 @@ export function ProductGrid({
               collections:
                 item.product_collections?.data?.map((c) => c.name) || [],
               badge: item.metadata?.badge,
+              gallery_ids: item.metadata?.gallery_ids,
             };
           });
 

@@ -123,3 +123,40 @@ export async function checkExistingWPMediaByFilename(
     throw error; // Re-throw the error to stop the process
   }
 }
+
+export async function getWPImage(id: number): Promise<string | null> {
+  try {
+    console.log(`Fetching WordPress media with ID: ${id}`);
+
+    const response = await fetch(
+      `${process.env.WP_URL!}/wp-json/wp/v2/media/${id}`,
+      {
+        headers: {
+          Authorization:
+            "Basic " +
+            Buffer.from(
+              `${process.env.WP_USERNAME!}:${process.env.WP_APP_PASSWORD!}`
+            ).toString("base64"),
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Error fetching media with ID ${id}: ${response.status}`);
+      return null;
+    }
+
+    const media = await response.json();
+
+    if (!media || !media.source_url) {
+      console.error(`Media with ID ${id} does not have a source URL`);
+      return null;
+    }
+
+    console.log(`Successfully fetched media URL: ${media.source_url}`);
+    return media.source_url;
+  } catch (error) {
+    console.error(`Error fetching media with ID ${id}:`, error);
+    return null;
+  }
+}
