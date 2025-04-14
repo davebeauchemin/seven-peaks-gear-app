@@ -68,8 +68,6 @@ export function ProductGrid({
           productCollectionIds: filters.length > 0 ? filters : undefined,
         })) as SureCartResponse;
 
-        console.log(response); // For now, just console.log the response
-
         // Transform SureCart products to match our Product interface
         if (response?.data) {
           const transformedProducts = response.data.map((item) => {

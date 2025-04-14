@@ -226,17 +226,18 @@ export function ProductFilter({
         newFilters.collections = [{ id: filterId, name: filterName }];
       }
 
-      // Notify parent component about filter changes
-      onFilterChange(newFilters);
       return newFilters;
     });
   };
 
+  // Use effect to notify parent when filters change
+  useEffect(() => {
+    onFilterChange(activeFilters);
+  }, [activeFilters, onFilterChange]);
+
   // Clear all filters
   const clearFilters = () => {
-    const emptyFilters = { collections: [], priceRange: [] };
-    setActiveFilters(emptyFilters);
-    onFilterChange(emptyFilters);
+    setActiveFilters({ collections: [], priceRange: [] });
   };
 
   // Collection filter item renderer

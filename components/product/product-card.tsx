@@ -12,34 +12,24 @@ export function ProductCard({ product }: { product: any }) {
 
   useEffect(() => {
     async function fetchProductImage() {
-      // Check if product has gallery_ids and it's not empty
-      if (
-        product?.gallery_ids &&
-        Array.isArray(product.gallery_ids) &&
-        product.gallery_ids.length > 0
-      ) {
-        try {
-          // Get just the first image ID
-          const firstImageId = product.gallery_ids[0];
+      // Get gallery_ids from either product directly or from product.metadata
+      const galleryIds = product?.gallery_ids || product?.metadata?.gallery_ids;
 
-          // Fetch the first image from the API endpoint
-          const response = await fetch(
-            `/api/wordpress-media?id=${firstImageId}`
-          );
-
-          if (response.ok) {
-            const imageData = await response.json();
-            setImageUrl(imageData.source_url || "/placeholder.svg");
-          }
-        } catch (error) {
-          console.error("Error fetching product image:", error);
-        }
-      } else if (typeof product?.gallery_ids === "string") {
-        // Handle case where gallery_ids might be a JSON string
+      // Check if we have gallery_ids and it's not empty
+      if (galleryIds) {
         try {
-          const parsedIds = JSON.parse(product.gallery_ids);
-          if (Array.isArray(parsedIds) && parsedIds.length > 0) {
+          // Handle both array and string (JSON) formats
+          const parsedIds = Array.isArray(galleryIds)
+            ? galleryIds
+            : typeof galleryIds === "string"
+              ? JSON.parse(galleryIds)
+              : null;
+
+          if (parsedIds && parsedIds.length > 0) {
+            // Get just the first image ID
             const firstImageId = parsedIds[0];
+
+            // Fetch the first image from the API endpoint
             const response = await fetch(
               `/api/wordpress-media?id=${firstImageId}`
             );
@@ -50,7 +40,7 @@ export function ProductCard({ product }: { product: any }) {
             }
           }
         } catch (error) {
-          console.error("Error parsing or fetching product image:", error);
+          console.error("Error fetching product image:", error);
         }
       }
       setIsLoading(false);
