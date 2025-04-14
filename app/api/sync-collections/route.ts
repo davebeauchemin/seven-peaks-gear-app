@@ -4,7 +4,7 @@ import {
   deleteProductCollection,
   getProductCollections,
 } from "@/lib/surecart/surecart-collections";
-import { SureCartProductCollectionResponse } from "@/types";
+import { SureCartProductCollectionResponse } from "@/types/types";
 import { NextRequest, NextResponse } from "next/server";
 
 // Collection item type from CSV

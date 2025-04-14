@@ -1,7 +1,10 @@
 import { fetchCSVData } from "@/lib/csv-helpers";
 import { NextRequest, NextResponse } from "next/server";
 import { createSureCartMedia } from "@/lib/surecart/surecart-core-modules";
-import { ProductCSVItem, SureCartProductCollectionResponse } from "@/types";
+import {
+  ProductCSVItem,
+  SureCartProductCollectionResponse,
+} from "@/types/types";
 import {
   createSureCartProduct,
   createSureCartProductPrice,

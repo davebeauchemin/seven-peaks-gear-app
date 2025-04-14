@@ -4,7 +4,7 @@ import { fetchSureCart } from "./surecart-helpers";
 import {
   SureCartProductCollectionResponse,
   SureCartProductCollection,
-} from "../../types";
+} from "../../types/types";
 
 export async function getProductCollections(
   query: Record<string, string | number | boolean | undefined> = {}

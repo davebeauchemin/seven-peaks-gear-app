@@ -1,6 +1,6 @@
 "use server";
 
-import { SureCartApiError, SureCartApiParams } from "../../types";
+import { SureCartApiError, SureCartApiParams } from "../../types/types";
 
 /**
  * Base URL and API key for SureCart API

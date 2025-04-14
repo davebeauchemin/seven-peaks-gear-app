@@ -6,7 +6,7 @@ import {
   SureCartVariantOption,
   SureCartVariant,
   SureCartProduct,
-} from "../../types";
+} from "../../types/types";
 
 export async function getSureCartProducts({
   archived = false,

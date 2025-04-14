@@ -1,7 +1,7 @@
 import { fetchCSVData } from "@/lib/csv-helpers";
 import { CollectionCSVItem } from "@/app/api/sync-product/route";
 import { NextRequest, NextResponse } from "next/server";
-import { SureCartProductCollection } from "@/types";
+import { SureCartProductCollection } from "@/types/types";
 import { createProductCollection } from "@/lib/surecart/surecart-collections";
 
 export async function POST(request: NextRequest) {
