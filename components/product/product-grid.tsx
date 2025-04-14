@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "./product-card";
@@ -41,7 +41,36 @@ interface SureCartResponse {
       prices_count: number;
     };
   }>;
+  pagination?: {
+    count: number;
+    limit: number | null;
+    page: number | null;
+  };
 }
+
+// Sort options
+const sortOptions = [
+  { value: "featured", label: "Featured" },
+  { value: "newest", label: "Newest", sort: "created_at:desc" },
+  { value: "oldest", label: "Oldest", sort: "created_at:asc" },
+  { value: "name_asc", label: "Name (A-Z)", sort: "name:asc" },
+  { value: "name_desc", label: "Name (Z-A)", sort: "name:desc" },
+  {
+    value: "recently_updated",
+    label: "Recently Updated",
+    sort: "updated_at:desc",
+  },
+  {
+    value: "cataloged_newest",
+    label: "Recently Cataloged",
+    sort: "cataloged_at:desc",
+  },
+  {
+    value: "cataloged_oldest",
+    label: "Oldest Cataloged",
+    sort: "cataloged_at:asc",
+  },
+];
 
 export function ProductGrid({
   filters = [],
@@ -52,21 +81,80 @@ export function ProductGrid({
 }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    limit: 12,
+  });
 
-  // Fetch products based on filters and sort
+  // Reference to track previous filters and sort
+  const prevFiltersRef = useRef<string[]>([]);
+  const prevSortByRef = useRef<string>("");
+
+  // Function to get sort parameter for API call
+  const getSortParam = (sortValue: string): string | undefined => {
+    if (sortValue === "featured") return undefined; // Featured is handled separately
+
+    // Find the sort option that matches the sortBy value
+    const sortOption = sortOptions.find((option) => option.value === sortValue);
+    return sortOption?.sort;
+  };
+
+  // Combined effect for filter changes and data fetching
   useEffect(() => {
+    const filtersChanged =
+      JSON.stringify(prevFiltersRef.current) !== JSON.stringify(filters);
+    const sortByChanged = prevSortByRef.current !== sortBy;
+
+    // Update currentPage state if filters/sort changed
+    let currentPage = pagination.currentPage;
+    if (filtersChanged || sortByChanged) {
+      currentPage = 1;
+      setPagination((prev) => ({
+        ...prev,
+        currentPage: 1,
+      }));
+    }
+
+    // Track previous values
+    prevFiltersRef.current = [...filters];
+    prevSortByRef.current = sortBy;
+
+    // Fetch products function
     const fetchProducts = async () => {
       setIsLoading(true);
 
       try {
-        // Fetch products from SureCart API with proper sorting and filters
+        // Use currentPage to ensure we always use the correct page number
         const response = (await getSureCartProducts({
-          limit: 12,
+          limit: pagination.limit,
+          page: currentPage,
           expand: ["product_collections"],
           featured: sortBy === "featured",
-          sort: sortBy === "newest" ? "created_at:desc" : undefined,
+          sort: getSortParam(sortBy),
           productCollectionIds: filters.length > 0 ? filters : undefined,
         })) as SureCartResponse;
+
+        // Update pagination information
+        if (response.pagination) {
+          const { count, limit } = response.pagination;
+          const limitValue = limit || pagination.limit;
+          const totalPages = Math.ceil(count / limitValue);
+
+          // Make sure the current page is within bounds
+          const validCurrentPage = Math.min(
+            response.pagination.page || 1,
+            totalPages || 1
+          );
+
+          setPagination({
+            currentPage: validCurrentPage,
+            totalPages,
+            totalItems: count,
+            limit: limitValue,
+          });
+        }
 
         // Transform SureCart products to match our Product interface
         if (response?.data) {
@@ -114,6 +202,16 @@ export function ProductGrid({
         }
       } catch (error) {
         console.error("Error fetching products:", error);
+
+        // If we get a page out of range error, try fetching page 1
+        if (String(error).includes("expected :page") && currentPage > 1) {
+          console.log("Page out of range, fetching page 1 instead");
+          setPagination((prev) => ({
+            ...prev,
+            currentPage: 1,
+          }));
+        }
+
         setProducts([]);
       } finally {
         setIsLoading(false);
@@ -121,7 +219,66 @@ export function ProductGrid({
     };
 
     fetchProducts();
-  }, [filters, sortBy]);
+  }, [filters, sortBy, pagination.currentPage]);
+
+  // Handle page changes with scroll to top
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      // Update page
+      setPagination((prev) => ({
+        ...prev,
+        currentPage: newPage,
+      }));
+
+      // Scroll to top smoothly
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const { currentPage, totalPages } = pagination;
+    const pageNumbers = [];
+
+    // Logic to show a reasonable number of page buttons
+    if (totalPages <= 5) {
+      // Show all pages if 5 or fewer
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i);
+      }
+    } else {
+      // Always show first page
+      pageNumbers.push(1);
+
+      // Show ellipsis or pages around current
+      if (currentPage > 3) {
+        pageNumbers.push("ellipsis");
+      }
+
+      // Pages around current
+      const startPage = Math.max(2, currentPage - 1);
+      const endPage = Math.min(totalPages - 1, currentPage + 1);
+
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+      }
+
+      // Another ellipsis if needed
+      if (currentPage < totalPages - 2) {
+        pageNumbers.push("ellipsis");
+      }
+
+      // Always show last page if more than 1 page
+      if (totalPages > 1) {
+        pageNumbers.push(totalPages);
+      }
+    }
+
+    return pageNumbers;
+  };
 
   return (
     <div className="flex-1">
@@ -153,26 +310,46 @@ export function ProductGrid({
       )}
 
       {/* Pagination */}
-      {!isLoading && products.length > 0 && (
+      {!isLoading && products.length > 0 && pagination.totalPages > 1 && (
         <div className="mt-10 flex justify-center">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled>
-              Previous
-            </Button>
             <Button
               variant="outline"
               size="sm"
-              className="bg-primary text-primary-foreground"
+              disabled={pagination.currentPage === 1}
+              onClick={() => handlePageChange(pagination.currentPage - 1)}
             >
-              1
+              Previous
             </Button>
-            <Button variant="outline" size="sm">
-              2
-            </Button>
-            <Button variant="outline" size="sm">
-              3
-            </Button>
-            <Button variant="outline" size="sm">
+
+            {getPageNumbers().map((pageNum, index) =>
+              pageNum === "ellipsis" ? (
+                <span key={`ellipsis-${index}`} className="px-2">
+                  ...
+                </span>
+              ) : (
+                <Button
+                  key={`page-${pageNum}`}
+                  variant="outline"
+                  size="sm"
+                  className={
+                    pagination.currentPage === pageNum
+                      ? "bg-primary text-primary-foreground"
+                      : ""
+                  }
+                  onClick={() => handlePageChange(Number(pageNum))}
+                >
+                  {pageNum}
+                </Button>
+              )
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.currentPage === pagination.totalPages}
+              onClick={() => handlePageChange(pagination.currentPage + 1)}
+            >
               Next
             </Button>
           </div>

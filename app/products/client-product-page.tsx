@@ -18,7 +18,25 @@ type FilterItem = { id: string; name: string };
 // Sort options
 const sortOptions = [
   { value: "featured", label: "Featured" },
-  { value: "newest", label: "Newest" },
+  { value: "newest", label: "Newest", sort: "created_at:desc" },
+  { value: "oldest", label: "Oldest", sort: "created_at:asc" },
+  { value: "name_asc", label: "Name (A-Z)", sort: "name:asc" },
+  { value: "name_desc", label: "Name (Z-A)", sort: "name:desc" },
+  {
+    value: "recently_updated",
+    label: "Recently Updated",
+    sort: "updated_at:desc",
+  },
+  {
+    value: "cataloged_newest",
+    label: "Recently Cataloged",
+    sort: "cataloged_at:desc",
+  },
+  {
+    value: "cataloged_oldest",
+    label: "Oldest Cataloged",
+    sort: "cataloged_at:asc",
+  },
 ];
 
 export default function ProductsPage() {
@@ -131,37 +149,5 @@ export default function ProductsPage() {
         </div>
       </div>
     </main>
-  );
-}
-
-function ProductFilterWrapper() {
-  return (
-    <>
-      <ClientFilterGrid />
-    </>
-  );
-}
-
-function ClientFilterGrid() {
-  const [activeFilters, setActiveFilters] = useState<FilterItem[]>([]);
-  const [activeSort, setActiveSort] = useState("newest");
-
-  // Adapter function for ClientFilterGrid
-  const handleFilterChange = (filters: {
-    collections: Array<{ id: string; name: string }>;
-    priceRange: Array<{ id: string; name: string }>;
-  }) => {
-    // Just use the collections, ignore priceRange
-    setActiveFilters(filters.collections);
-  };
-
-  return (
-    <>
-      <ProductFilter onFilterChange={handleFilterChange} />
-      <ProductGrid
-        filters={activeFilters.map((f) => f.id)}
-        sortBy={activeSort}
-      />
-    </>
   );
 }
