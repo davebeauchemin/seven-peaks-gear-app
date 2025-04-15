@@ -47,8 +47,8 @@ export default function Home() {
                 most ambitious riders.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="font-medium">
-                  Shop Collection
+                <Button size="lg" className="font-medium" asChild>
+                  <Link href="/products">Shop Collection</Link>
                 </Button>
                 <Button
                   size="lg"
