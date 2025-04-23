@@ -1,0 +1,463 @@
+{
+  "productName": "PILOT",
+  "productSlug": "pilot-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "PILOT",
+  "productSlug": "pilot-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "KITTY",
+  "productSlug": "kitty-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "KITTY",
+  "productSlug": "kitty-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "RACER",
+  "productSlug": "racer-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "RACER",
+  "productSlug": "racer-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "SALLY",
+  "productSlug": "sally-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "SALLY",
+  "productSlug": "sally-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "ROAD MAZE",
+  "productSlug": "road-maze-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "ROAD MAZE",
+  "productSlug": "road-maze-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "MTB HEROES",
+  "productSlug": "mtb-heroes-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "MTB HEROES",
+  "productSlug": "mtb-heroes-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "MTB SPIRIT",
+  "productSlug": "mtb-spirit-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "MTB SPIRIT",
+  "productSlug": "mtb-spirit-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "MTB/BMX HAWK",
+  "productSlug": "mtb/bmx-hawk-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "MTB/BMX HAWK",
+  "productSlug": "mtb/bmx-hawk-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "MTB STRIKER",
+  "productSlug": "mtb-striker-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "MTB STRIKER",
+  "productSlug": "mtb-striker-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "ROAD SPARK",
+  "productSlug": "road-spark-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "ROAD SPARK",
+  "productSlug": "road-spark-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "ROAD WORLD",
+  "productSlug": "road-world-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "ROAD WORLD",
+  "productSlug": "road-world-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "MTB FIERCE",
+  "productSlug": "mtb-fierce-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "MTB FIERCE",
+  "productSlug": "mtb-fierce-bike-equipement,bike-equipement-helmet",
+  "categorySlug": "bike-equipement-helmet",
+  "normalizedSlug": "bike-equipement-helmet",
+  "message": "Collection with slug \"bike-equipement-helmet\" or normalized slug \"bike-equipement-helmet\" does not exist"
+}
+
+{
+  "productName": "SKEL",
+  "productSlug": "skel-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "SKEL",
+  "productSlug": "skel-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement-gloves",
+  "normalizedSlug": "bike-equipement-gloves",
+  "message": "Collection with slug \"bike-equipement-gloves\" or normalized slug \"bike-equipement-gloves\" does not exist"
+}
+
+{
+  "productName": "MOG",
+  "productSlug": "mog-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "MOG",
+  "productSlug": "mog-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement-gloves",
+  "normalizedSlug": "bike-equipement-gloves",
+  "message": "Collection with slug \"bike-equipement-gloves\" or normalized slug \"bike-equipement-gloves\" does not exist"
+}
+
+{
+  "productName": "HIKE",
+  "productSlug": "hike-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "HIKE",
+  "productSlug": "hike-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement-gloves",
+  "normalizedSlug": "bike-equipement-gloves",
+  "message": "Collection with slug \"bike-equipement-gloves\" or normalized slug \"bike-equipement-gloves\" does not exist"
+}
+
+{
+  "productName": "RASTOR",
+  "productSlug": "rastor-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "RASTOR",
+  "productSlug": "rastor-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement-gloves",
+  "normalizedSlug": "bike-equipement-gloves",
+  "message": "Collection with slug \"bike-equipement-gloves\" or normalized slug \"bike-equipement-gloves\" does not exist"
+}
+
+{
+  "productName": "EDGE",
+  "productSlug": "edge-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "EDGE",
+  "productSlug": "edge-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement-gloves",
+  "normalizedSlug": "bike-equipement-gloves",
+  "message": "Collection with slug \"bike-equipement-gloves\" or normalized slug \"bike-equipement-gloves\" does not exist"
+}
+
+{
+  "productName": "SLAP",
+  "productSlug": "slap-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "SLAP",
+  "productSlug": "slap-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement-gloves",
+  "normalizedSlug": "bike-equipement-gloves",
+  "message": "Collection with slug \"bike-equipement-gloves\" or normalized slug \"bike-equipement-gloves\" does not exist"
+}
+
+{
+  "productName": "DNA",
+  "productSlug": "dna-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "DNA",
+  "productSlug": "dna-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement-gloves",
+  "normalizedSlug": "bike-equipement-gloves",
+  "message": "Collection with slug \"bike-equipement-gloves\" or normalized slug \"bike-equipement-gloves\" does not exist"
+}
+
+{
+  "productName": "PITCH",
+  "productSlug": "pitch-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "PITCH",
+  "productSlug": "pitch-bike-equipement,bike-equipement-gloves",
+  "categorySlug": "bike-equipement-gloves",
+  "normalizedSlug": "bike-equipement-gloves",
+  "message": "Collection with slug \"bike-equipement-gloves\" or normalized slug \"bike-equipement-gloves\" does not exist"
+}
+
+{
+  "productName": "TB16-B1688",
+  "productSlug": "tb16-b1688-bike-equipement,bike-equipement-shoes",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "TB16-B1688",
+  "productSlug": "tb16-b1688-bike-equipement,bike-equipement-shoes",
+  "categorySlug": "bike-equipement-shoes",
+  "normalizedSlug": "bike-equipement-shoes",
+  "message": "Collection with slug \"bike-equipement-shoes\" or normalized slug \"bike-equipement-shoes\" does not exist"
+}
+
+{
+  "productName": "TB35-B1805",
+  "productSlug": "tb35-b1805-bike-equipement,bike-equipement-shoes",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "TB35-B1805",
+  "productSlug": "tb35-b1805-bike-equipement,bike-equipement-shoes",
+  "categorySlug": "bike-equipement-shoes",
+  "normalizedSlug": "bike-equipement-shoes",
+  "message": "Collection with slug \"bike-equipement-shoes\" or normalized slug \"bike-equipement-shoes\" does not exist"
+}
+
+{
+  "productName": "TB35-B1651",
+  "productSlug": "tb35-b1651-bike-equipement,bike-equipement-shoes",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "TB35-B1651",
+  "productSlug": "tb35-b1651-bike-equipement,bike-equipement-shoes",
+  "categorySlug": "bike-equipement-shoes",
+  "normalizedSlug": "bike-equipement-shoes",
+  "message": "Collection with slug \"bike-equipement-shoes\" or normalized slug \"bike-equipement-shoes\" does not exist"
+}
+
+{
+  "productName": "TB15-B1823",
+  "productSlug": "tb15-b1823-bike-equipement,bike-equipement-shoes",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "TB15-B1823",
+  "productSlug": "tb15-b1823-bike-equipement,bike-equipement-shoes",
+  "categorySlug": "bike-equipement-shoes",
+  "normalizedSlug": "bike-equipement-shoes",
+  "message": "Collection with slug \"bike-equipement-shoes\" or normalized slug \"bike-equipement-shoes\" does not exist"
+}
+
+{
+  "productName": "Flexible Bicycle Lock",
+  "productSlug": "flexible-bicycle-lock-bike-equipement,bike-equipement-bike-lock",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "Flexible Bicycle Lock",
+  "productSlug": "flexible-bicycle-lock-bike-equipement,bike-equipement-bike-lock",
+  "categorySlug": "bike-equipement-bike-lock",
+  "normalizedSlug": "bike-equipement-bike-lock",
+  "message": "Collection with slug \"bike-equipement-bike-lock\" or normalized slug \"bike-equipement-bike-lock\" does not exist"
+}
+
+{
+  "productName": "Hard Bicycle Lock",
+  "productSlug": "hard-bicycle-lock-bike-equipement,bike-equipement-bike-lock",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "Hard Bicycle Lock",
+  "productSlug": "hard-bicycle-lock-bike-equipement,bike-equipement-bike-lock",
+  "categorySlug": "bike-equipement-bike-lock",
+  "normalizedSlug": "bike-equipement-bike-lock",
+  "message": "Collection with slug \"bike-equipement-bike-lock\" or normalized slug \"bike-equipement-bike-lock\" does not exist"
+}
+
+{
+  "productName": "Water Bottle",
+  "productSlug": "water-bottle-bike-equipement,bike-equipement-bike-water-bottle",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "Water Bottle",
+  "productSlug": "water-bottle-bike-equipement,bike-equipement-bike-water-bottle",
+  "categorySlug": "bike-equipement-bike-water-bottle",
+  "normalizedSlug": "bike-equipement-bike-water-bottle",
+  "message": "Collection with slug \"bike-equipement-bike-water-bottle\" or normalized slug \"bike-equipement-bike-water-bottle\" does not exist"
+}
+
+{
+  "productName": "Water Bottle Rack",
+  "productSlug": "water-bottle-rack-bike-equipement,bike-equipement-bike-water-bottle",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "Water Bottle Rack",
+  "productSlug": "water-bottle-rack-bike-equipement,bike-equipement-bike-water-bottle",
+  "categorySlug": "bike-equipement-bike-water-bottle",
+  "normalizedSlug": "bike-equipement-bike-water-bottle",
+  "message": "Collection with slug \"bike-equipement-bike-water-bottle\" or normalized slug \"bike-equipement-bike-water-bottle\" does not exist"
+}
+
+{
+  "productName": "Aluminium Bike Pedal",
+  "productSlug": "aluminium-bike-pedal-bike-equipement,bike-equipement-pedals",
+  "categorySlug": "bike-equipement",
+  "normalizedSlug": "bike-equipement",
+  "message": "Collection with slug \"bike-equipement\" or normalized slug \"bike-equipement\" does not exist"
+}
+
+{
+  "productName": "Aluminium Bike Pedal",
+  "productSlug": "aluminium-bike-pedal-bike-equipement,bike-equipement-pedals",
+  "categorySlug": "bike-equipement-pedals",
+  "normalizedSlug": "bike-equipement-pedals",
+  "message": "Collection with slug \"bike-equipement-pedals\" or normalized slug \"bike-equipement-pedals\" does not exist"
+}

@@ -1,0 +1,39 @@
+{
+  "productName": "ALPE",
+  "productSlug": "alpe-bike,bike-electric-bike-road-bike",
+  "categorySlug": "BIKE-ELECTRIC-BIKE-ROAD-BIKE",
+  "normalizedSlug": "bike-electric-bike-road-bike",
+  "message": "Collection with slug \"BIKE-ELECTRIC-BIKE-ROAD-BIKE\" or normalized slug \"bike-electric-bike-road-bike\" does not exist"
+}
+
+{
+  "productName": "PATH",
+  "productSlug": "path-bike,bike-electric-bike-road-bike",
+  "categorySlug": "BIKE-ELECTRIC-BIKE-ROAD-BIKE",
+  "normalizedSlug": "bike-electric-bike-road-bike",
+  "message": "Collection with slug \"BIKE-ELECTRIC-BIKE-ROAD-BIKE\" or normalized slug \"bike-electric-bike-road-bike\" does not exist"
+}
+
+{
+  "productName": "KLUTCH",
+  "productSlug": "klutch-bike,bike-junior-bike-mountain-bike",
+  "categorySlug": "BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE",
+  "normalizedSlug": "bike-junior-bike-mountain-bike",
+  "message": "Collection with slug \"BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE\" or normalized slug \"bike-junior-bike-mountain-bike\" does not exist"
+}
+
+{
+  "productName": "RUNAWAY",
+  "productSlug": "runaway-bike,bike-junior-bike-mountain-bike",
+  "categorySlug": "BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE",
+  "normalizedSlug": "bike-junior-bike-mountain-bike",
+  "message": "Collection with slug \"BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE\" or normalized slug \"bike-junior-bike-mountain-bike\" does not exist"
+}
+
+{
+  "productName": "DUST",
+  "productSlug": "dust-bike,bike-junior-bike-mountain-bike",
+  "categorySlug": "BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE",
+  "normalizedSlug": "bike-junior-bike-mountain-bike",
+  "message": "Collection with slug \"BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE\" or normalized slug \"bike-junior-bike-mountain-bike\" does not exist"
+}

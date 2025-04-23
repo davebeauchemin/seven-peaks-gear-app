@@ -1,0 +1,15 @@
+{
+  "productName": "ALPE",
+  "productSlug": "alpe-bike,bike-electric-bike-road-bike",
+  "categorySlug": "BIKE-ELECTRIC-BIKE-ROAD-BIKE",
+  "normalizedSlug": "bike-electric-bike-road-bike",
+  "message": "Collection with slug \"BIKE-ELECTRIC-BIKE-ROAD-BIKE\" or normalized slug \"bike-electric-bike-road-bike\" does not exist"
+}
+
+{
+  "productName": "PATH",
+  "productSlug": "path-bike,bike-electric-bike-road-bike",
+  "categorySlug": "BIKE-ELECTRIC-BIKE-ROAD-BIKE",
+  "normalizedSlug": "bike-electric-bike-road-bike",
+  "message": "Collection with slug \"BIKE-ELECTRIC-BIKE-ROAD-BIKE\" or normalized slug \"bike-electric-bike-road-bike\" does not exist"
+}

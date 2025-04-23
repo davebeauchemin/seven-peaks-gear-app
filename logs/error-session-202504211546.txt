@@ -1,0 +1,146 @@
+{
+  "productName": "ALPE",
+  "productSlug": "alpe-bike-electric-bike-road-bike",
+  "categorySlug": "BIKE-ELECTRIC-BIKE-ROAD-BIKE",
+  "message": "Collection with slug \"BIKE-ELECTRIC-BIKE-ROAD-BIKE\" does not exist"
+}
+
+{
+  "productName": "PATH",
+  "productSlug": "path-bike-electric-bike-road-bike",
+  "categorySlug": "BIKE-ELECTRIC-BIKE-ROAD-BIKE",
+  "message": "Collection with slug \"BIKE-ELECTRIC-BIKE-ROAD-BIKE\" does not exist"
+}
+
+{
+  "productName": "FUSION",
+  "productSlug": "fusion-bike-electric-mountain-bike",
+  "categorySlug": "BIKE-ELECTRIC-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-ELECTRIC-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "E-TRANSIT",
+  "productSlug": "e-transit-bike-electric-city-bike",
+  "categorySlug": "BIKE-ELECTRIC-CITY-BIKE",
+  "message": "Collection with slug \"BIKE-ELECTRIC-CITY-BIKE\" does not exist"
+}
+
+{
+  "productName": "E9R",
+  "productSlug": "e9r-bike-electric-city-bike",
+  "categorySlug": "BIKE-ELECTRIC-CITY-BIKE",
+  "message": "Collection with slug \"BIKE-ELECTRIC-CITY-BIKE\" does not exist"
+}
+
+{
+  "productName": "E8",
+  "productSlug": "e8-bike-electric-city-bike",
+  "categorySlug": "BIKE-ELECTRIC-CITY-BIKE",
+  "message": "Collection with slug \"BIKE-ELECTRIC-CITY-BIKE\" does not exist"
+}
+
+{
+  "productName": "BACK COUNTRY",
+  "productSlug": "back-country-bike-road-bike",
+  "categorySlug": "BIKE-ROAD-BIKE",
+  "message": "Collection with slug \"BIKE-ROAD-BIKE\" does not exist"
+}
+
+{
+  "productName": "MANIAC",
+  "productSlug": "maniac-bike-mountain-bike",
+  "categorySlug": "BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "TITAN",
+  "productSlug": "titan--bike-mountain-bike",
+  "categorySlug": "BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "EVIL",
+  "productSlug": "evil-bike-mountain-bike",
+  "categorySlug": "BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "OUTLAW",
+  "productSlug": "outlaw-bike-mountain-bike",
+  "categorySlug": "BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "CLOUD 530",
+  "productSlug": "cloud-530-bike-mountain-bike",
+  "categorySlug": "BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "KOZAK",
+  "productSlug": "kozak-bike-mountain-bike",
+  "categorySlug": "BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "COYOTE",
+  "productSlug": "coyote-bike-mountain-bike",
+  "categorySlug": "BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "CLIFF",
+  "productSlug": "cliff-bike-mountain-bike",
+  "categorySlug": "BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "KLUTCH",
+  "productSlug": "klutch-bike-junior-bike-mountain-bike",
+  "categorySlug": "BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "RUNAWAY",
+  "productSlug": "runaway-bike-junior-bike-mountain-bike",
+  "categorySlug": "BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "DUST",
+  "productSlug": "dust-bike-junior-bike-mountain-bike",
+  "categorySlug": "BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE",
+  "message": "Collection with slug \"BIKE-JUNIOR-BIKE-MOUNTAIN-BIKE\" does not exist"
+}
+
+{
+  "productName": "FREELANCE",
+  "productSlug": "freelance-bike-hybrid-bike",
+  "categorySlug": "BIKE-HYBRID-BIKE",
+  "message": "Collection with slug \"BIKE-HYBRID-BIKE\" does not exist"
+}
+
+{
+  "productName": "FRONTIER",
+  "productSlug": "frontier-bike-hybrid-bike",
+  "categorySlug": "BIKE-HYBRID-BIKE",
+  "message": "Collection with slug \"BIKE-HYBRID-BIKE\" does not exist"
+}
+
+{
+  "productName": "VICTORY",
+  "productSlug": "victory-bike-hybrid-bike",
+  "categorySlug": "BIKE-HYBRID-BIKE",
+  "message": "Collection with slug \"BIKE-HYBRID-BIKE\" does not exist"
+}

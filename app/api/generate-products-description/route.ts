@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { parse } from "csv-parse";
 import { sheets_v4 } from "@googleapis/sheets";
 import { JWT } from "google-auth-library";
-import { generateProductDescription } from "@/lib/openai/openai-utils";
+import {
+  generateProductDescription,
+  generateShortProductDescription,
+} from "@/lib/openai/openai-utils";
 
 // Helper function to parse CSV data
 async function parseCSV(csvContent: string) {
@@ -46,18 +49,28 @@ function buildSheetsUrl(sheetId: string, gid: string): string {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
 }
 
-// Group products by Handle
-function groupProductsByHandle(products: any[]): Map<string, any[]> {
+// Extract images from comma-separated string
+function extractImages(imageString: string | null | undefined): string[] {
+  if (!imageString) return [];
+
+  return imageString
+    .split(",")
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0);
+}
+
+// Group products by Slug
+function groupProductsBySlug(products: any[]): Map<string, any[]> {
   const productGroups = new Map<string, any[]>();
 
   products.forEach((item) => {
-    const handle = item.Handle;
-    if (!handle) return; // Skip items without a handle
+    const slug = item.Slug;
+    if (!slug) return; // Skip items without a slug
 
-    if (!productGroups.has(handle)) {
-      productGroups.set(handle, []);
+    if (!productGroups.has(slug)) {
+      productGroups.set(slug, []);
     }
-    productGroups.get(handle)!.push(item);
+    productGroups.get(slug)!.push(item);
   });
 
   return productGroups;
@@ -119,14 +132,15 @@ export async function POST(req: NextRequest) {
     const csvContent = await fetchCSVData(targetCsvUrl);
     const products = await parseCSV(csvContent);
 
-    // Group products by Handle to avoid generating descriptions for each variant
-    const productGroups = groupProductsByHandle(products);
+    // Group products by Slug to avoid generating descriptions for each variant
+    const productGroups = groupProductsBySlug(products);
     console.log(
       `Found ${products.length} product rows (${productGroups.size} unique products)`
     );
 
-    // Store updated descriptions with handle as key for easier spreadsheet updating
+    // Store updated descriptions with slug as key for easier spreadsheet updating
     const productDescriptions = new Map<string, string>();
+    const shortProductDescriptions = new Map<string, string>();
 
     // Get the available headers to find the description column
     const headers = Object.keys(products[0]);
@@ -145,60 +159,137 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Find the short description column
+    const shortDescriptionHeaders = [
+      "Short Description",
+      "short_description",
+      "Short_Description",
+    ];
+    let shortDescColumnName = "";
+
+    for (const header of shortDescriptionHeaders) {
+      if (headers.indexOf(header) !== -1) {
+        shortDescColumnName = header;
+        break;
+      }
+    }
+
+    // If short description column is not found, don't attempt to generate short descriptions
+    const generateShortDesc = shortDescColumnName !== "";
+
+    // Find the images column
+    const imageColumnName =
+      headers.find((header) =>
+        ["Images", "Image", "Image Src", "image", "images"].includes(header)
+      ) || "Images";
+
     // Generate descriptions for each unique product (not each variant)
     let processedCount = 0;
     let generatedCount = 0;
 
     // Use Array.from to convert Map entries to array for iteration
-    for (const [handle, variants] of Array.from(productGroups.entries())) {
+    const productEntries = Array.from(productGroups.entries());
+
+    // Process all products
+    for (const [slug, variants] of productEntries) {
       try {
         // Use the first variant for product details
         const product = variants[0];
 
         // Check if this product already has a description
         const existingDescription = product[descColumnName]?.trim();
-
-        // Skip description generation if product already has one and we're not forcing updates
-        if (existingDescription && !forceUpdate) {
-          processedCount++;
-          console.log(
-            `Skipping description for ${product.Title} (already exists)`
-          );
-          continue;
-        }
+        const existingShortDescription = generateShortDesc
+          ? product[shortDescColumnName]?.trim()
+          : "";
 
         // Extract metadata fields for more detailed descriptions
         const metadata: Record<string, any> = {};
 
         // Add relevant metadata fields if they exist
         Object.keys(product).forEach((key) => {
-          if (key.startsWith("Metafield:") && product[key]) {
-            const metadataKey = key.replace("Metafield:", "").trim();
+          if (key.startsWith("Metadata:") && product[key]) {
+            const metadataKey = key.replace("Metadata:", "").trim();
             metadata[metadataKey] = product[key];
           }
         });
 
-        console.log(
-          `Generating description for "${product.Title}" (${handle})`
-        );
+        // Collect all unique images from all variants
+        const allProductImages: string[] = [];
 
-        // Generate enhanced description
-        const enhancedDescription = await generateProductDescription({
-          title: product.Title || "",
-          category: product["Category - Name"] || "",
-          metadata,
+        variants.forEach((variant) => {
+          const variantImages = extractImages(variant[imageColumnName]);
+          if (variantImages.length > 0) {
+            // For each variant, we only take the first image if it's not already in our collection
+            const firstImage = variantImages[0];
+            if (!allProductImages.includes(firstImage)) {
+              allProductImages.push(firstImage);
+            }
+          }
         });
 
-        // Store the enhanced description with handle as key
-        productDescriptions.set(handle, enhancedDescription);
+        // Add images to metadata
+        if (allProductImages.length > 0) {
+          metadata.images = allProductImages;
+
+          // Set the main image (first one) separately
+          metadata.main_image = allProductImages[0];
+
+          // Include image count
+          metadata.image_count = allProductImages.length;
+        }
+
+        let enhancedDescription = existingDescription;
+
+        // Generate description only if it doesn't exist or force update is enabled
+        if (!existingDescription || forceUpdate) {
+          console.log(
+            `Generating description for "${product.Name}" (${slug}) with ${allProductImages.length} images`
+          );
+
+          // Generate enhanced description
+          enhancedDescription = await generateProductDescription({
+            title: product.Name || "",
+            category: product["Category - Name"] || "",
+            metadata,
+          });
+
+          // Store the enhanced description with slug as key
+          productDescriptions.set(slug, enhancedDescription);
+        } else {
+          console.log(
+            `Skipping description for ${product.Name} (already exists)`
+          );
+        }
+
+        // Generate short description if the column exists and it doesn't already have a value
+        if (generateShortDesc && (!existingShortDescription || forceUpdate)) {
+          console.log(
+            `Generating short description for "${product.Name}" (${slug})`
+          );
+
+          const shortDescription = await generateShortProductDescription(
+            {
+              title: product.Name || "",
+              category: product["Category - Name"] || "",
+              metadata,
+            },
+            enhancedDescription
+          );
+
+          // Store the short description with slug as key
+          shortProductDescriptions.set(slug, shortDescription);
+        } else if (generateShortDesc && existingShortDescription) {
+          console.log(
+            `Skipping short description for ${product.Name} (already exists)`
+          );
+        }
 
         processedCount++;
-        generatedCount++;
-        console.log(
-          `Generated description for ${product.Title} (${generatedCount} generated)`
-        );
+        if (!existingDescription || !existingShortDescription || forceUpdate) {
+          generatedCount++;
+        }
       } catch (error) {
-        console.error(`Error processing product ${handle}:`, error);
+        console.error(`Error processing product ${slug}:`, error);
       }
     }
 
@@ -207,7 +298,7 @@ export async function POST(req: NextRequest) {
     );
 
     // If no descriptions were generated, return early
-    if (productDescriptions.size === 0) {
+    if (productDescriptions.size === 0 && shortProductDescriptions.size === 0) {
       return NextResponse.json({
         success: true,
         message: "No new descriptions needed to be generated",
@@ -219,14 +310,23 @@ export async function POST(req: NextRequest) {
 
     // Update all products in the original array with their enhanced descriptions
     const updatedProducts = products.map((product) => {
-      const handle = product.Handle;
-      const enhancedDescription = productDescriptions.get(handle);
+      const slug = product.Slug;
+      const enhancedDescription = productDescriptions.get(slug);
+      const shortDescription = shortProductDescriptions.get(slug);
 
-      if (enhancedDescription) {
-        return {
-          ...product,
-          [descColumnName]: enhancedDescription,
-        };
+      if (enhancedDescription || shortDescription) {
+        const updatedProduct = { ...product };
+
+        if (enhancedDescription) {
+          updatedProduct[descColumnName] = enhancedDescription;
+        }
+
+        // Add short description if it exists
+        if (generateShortDesc && shortDescription) {
+          updatedProduct[shortDescColumnName] = shortDescription;
+        }
+
+        return updatedProduct;
       }
 
       return product;
@@ -262,37 +362,39 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        // Find the handle column index
-        const handleColumnIndex = headers.indexOf("Handle");
+        // Find the short description column index
+        const shortDescColumnIndex = generateShortDesc
+          ? headers.indexOf(shortDescColumnName)
+          : -1;
 
-        if (handleColumnIndex === -1) {
-          throw new Error("Handle column not found in the CSV");
+        // Find the slug column index
+        const slugColumnIndex = headers.indexOf("Slug");
+
+        if (slugColumnIndex === -1) {
+          throw new Error("Slug column not found in the CSV");
         }
 
-        // Prepare handle-to-row mapping for efficient updating
-        const handleToRowMap = new Map<string, number>();
+        // Prepare slug-to-row mapping for efficient updating
+        const slugToRowMap = new Map<string, number>();
         products.forEach((product, index) => {
-          const handle = product.Handle;
-          if (handle && !handleToRowMap.has(handle)) {
+          const slug = product.Slug;
+          if (slug && !slugToRowMap.has(slug)) {
             // +2 because: 1 for 0-based to 1-based, and 1 for header row
-            handleToRowMap.set(handle, index + 2);
+            slugToRowMap.set(slug, index + 2);
           }
         });
 
-        // Create update requests only for products that have descriptions
+        // Create update requests for all products that have generated descriptions
         const updateRequests = [];
 
-        // Use Array.from to convert Map entries to array for iteration
-        for (const [handle, description] of Array.from(
+        // Add full description updates
+        for (const [slug, description] of Array.from(
           productDescriptions.entries()
         )) {
-          const rowIndex = handleToRowMap.get(handle);
+          const rowIndex = slugToRowMap.get(slug);
 
           if (rowIndex) {
-            // Convert column index to A1 notation (A, B, C, etc.)
             const column = String.fromCharCode(65 + descColumnIndex);
-
-            // Format the range explicitly including the sheet name
             const range = `'${sheetName}'!${column}${rowIndex}`;
 
             updateRequests.push({
@@ -302,9 +404,30 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Add short description updates
+        if (generateShortDesc && shortDescColumnIndex !== -1) {
+          for (const [slug, shortDescription] of Array.from(
+            shortProductDescriptions.entries()
+          )) {
+            const rowIndex = slugToRowMap.get(slug);
+
+            if (rowIndex) {
+              const shortDescColumn = String.fromCharCode(
+                65 + shortDescColumnIndex
+              );
+              const shortDescRange = `'${sheetName}'!${shortDescColumn}${rowIndex}`;
+
+              updateRequests.push({
+                range: shortDescRange,
+                values: [[shortDescription]],
+              });
+            }
+          }
+        }
+
         if (updateRequests.length > 0) {
           console.log(
-            `Updating ${updateRequests.length} descriptions in spreadsheet`
+            `Updating ${updateRequests.length} fields in spreadsheet`
           );
 
           // Update in batches of 10
@@ -336,7 +459,7 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          console.log(`Updated spreadsheet with ${successCount} descriptions`);
+          console.log(`Updated spreadsheet with ${successCount} fields`);
         }
       } catch (error) {
         console.error("Error updating Google Sheet:", error);
@@ -353,13 +476,16 @@ export async function POST(req: NextRequest) {
       totalProducts: products.length,
       uniqueProducts: productGroups.size,
       generatedDescriptions: productDescriptions.size,
+      generatedShortDescriptions: shortProductDescriptions.size,
       updatedProducts: Array.from(productDescriptions.entries()).map(
-        ([handle, description]) => {
-          const product = products.find((p) => p.Handle === handle);
+        ([slug, description]) => {
+          const product = products.find((p) => p.Slug === slug);
           return {
-            handle,
-            title: product?.Title || handle,
+            slug,
+            name: product?.Name || slug,
             description,
+            shortDescription: shortProductDescriptions.get(slug) || "",
+            images: product ? extractImages(product[imageColumnName]) : [],
           };
         }
       ),

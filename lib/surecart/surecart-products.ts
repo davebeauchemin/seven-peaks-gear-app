@@ -8,6 +8,16 @@ import {
   SureCartProduct,
 } from "../../types/types";
 
+// Extract images from comma-separated string
+function extractImages(imageString: string | null | undefined): string[] {
+  if (!imageString) return [];
+
+  return imageString
+    .split(",")
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0);
+}
+
 export async function getSureCartProducts({
   archived = false,
   featured = false,
@@ -81,12 +91,37 @@ export async function createSureCartProduct(
   product: any
 ): Promise<SureCartProductResponse> {
   console.log("Creating product:", product.name);
-  const createProduct = await fetchSureCart<SureCartProductResponse>({
-    endpoint: "products?expand[]=variants",
-    method: "POST",
-    body: { product },
-  });
-  return createProduct;
+
+  // Determine if this is a simple product
+  const isSimpleProduct =
+    product.price && (!product.variants || product.variants.length === 0);
+  console.log(`Product type: ${isSimpleProduct ? "Simple" : "Variable"}`);
+
+  if (isSimpleProduct) {
+    console.log("Simple product details:", {
+      name: product.name,
+      price: product.price,
+      sku: product.sku || "not set",
+    });
+  } else {
+    console.log(
+      `Variable product with ${product.variants?.length || 0} variants`
+    );
+  }
+
+  try {
+    const createProduct = await fetchSureCart<SureCartProductResponse>({
+      endpoint: "products?expand[]=variants",
+      method: "POST",
+      body: { product },
+    });
+    console.log(`Product created successfully with ID: ${createProduct.id}`);
+    return createProduct;
+  } catch (error) {
+    console.error("Error creating product:", error);
+    console.error("Failed product data:", JSON.stringify(product, null, 2));
+    throw error;
+  }
 }
 
 export async function updateSureCartProduct(
@@ -222,8 +257,8 @@ export async function deleteAllProductVariants() {
 
       // Wait 3 seconds before processing the next batch
       if (i + batchSize < allVariantIds.length) {
-        console.log("Waiting 3 seconds before next batch...");
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        console.log("Waiting 2 seconds before next batch...");
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }
 
@@ -329,22 +364,38 @@ export async function createSureCartProductPrice(
 export function formatProductsForSureCart(
   productData: ProductCSVItem[]
 ): SureCartProduct[] {
-  // Group products by Handle (which should uniquely identify a product)
+  // Group products by Slug
   const productGroups = new Map<string, ProductCSVItem[]>();
 
-  // Group all variants by product handle
+  // Group all variants by product slug
   productData.forEach((item) => {
-    const productHandle = item.Handle;
-    if (!productGroups.has(productHandle)) {
-      productGroups.set(productHandle, []);
+    const productSlug = item.Slug;
+    if (!productGroups.has(productSlug)) {
+      productGroups.set(productSlug, []);
     }
-    productGroups.get(productHandle)!.push(item);
+    productGroups.get(productSlug)!.push(item);
   });
 
   // Convert each product group to a SureCart product
-  return Array.from(productGroups.entries()).map(([handle, items]) => {
+  return Array.from(productGroups.entries()).map(([slug, items]) => {
     // Use the first item for product details
     const firstItem = items[0];
+
+    // Format slug as [name]-[collection] if Category - Name is present
+    let formattedSlug = slug;
+    if (firstItem["Category - Name"]) {
+      const nameSlug = firstItem.Name.toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+      const categorySlug = firstItem["Category - Name"]
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+      formattedSlug = `${nameSlug}-${categorySlug}`;
+      console.log(
+        `Generated slug "${formattedSlug}" from name "${firstItem.Name}" and category "${firstItem["Category - Name"]}"`
+      );
+    }
 
     // Collect metadata from all fields that start with 'Metadata:' (using first item)
     const metadata: SureCartMetadata = {};
@@ -359,6 +410,93 @@ export function formatProductsForSureCart(
         }
       }
     });
+
+    // Add dimensions to metadata if provided
+    if (firstItem.Length || firstItem.Width || firstItem.Height) {
+      if (firstItem.Length) metadata.length = firstItem.Length;
+      if (firstItem.Width) metadata.width = firstItem.Width;
+      if (firstItem.Height) metadata.height = firstItem.Height;
+      if (firstItem["Size Unit"]) metadata.size_unit = firstItem["Size Unit"];
+    }
+
+    // Parse weight if available (using first item)
+    let weight = 0;
+    if (firstItem.Weight) {
+      weight = parseFloat(firstItem.Weight) || 0;
+    }
+
+    // Determine weight unit
+    const weightUnit = firstItem["Weight Unit"]?.toLowerCase() || "lb";
+
+    // Check if this is a simple product (no variant options)
+    const isSimpleProduct =
+      !firstItem["Option1 Name"] &&
+      !firstItem["Option2 Name"] &&
+      !firstItem["Option3 Name"];
+
+    // For simple products, use a different approach - no variants
+    if (isSimpleProduct) {
+      console.log(`${firstItem.Name} is a simple product without variants`);
+
+      // Parse price to cents for simple product
+      const priceInCents = Math.round(
+        parseFloat(firstItem.Price.replace(/[$,]/g, "")) * 100
+      );
+
+      // Extract images
+      const imageUrls = extractImages(firstItem.Images);
+      const primaryImage = imageUrls.length > 0 ? imageUrls[0] : "";
+
+      // Handle stock for simple product
+      const quantity = parseInt(firstItem.Quantity || "0", 10);
+      const stockEnabled =
+        firstItem.Quantity !== undefined &&
+        firstItem.Quantity !== null &&
+        firstItem.Quantity !== "";
+
+      // Add image URLs to metadata if available
+      if (primaryImage) {
+        metadata.primary_image = primaryImage;
+      }
+
+      if (imageUrls.length > 1) {
+        metadata.additional_images = imageUrls.slice(1).join(",");
+      }
+
+      // Return simple product format
+      return {
+        product: {
+          recurring: false,
+          metadata,
+          content: firstItem["Category - Name"]
+            ? `${firstItem["Category - Name"]} - ${firstItem.Name}`
+            : `${firstItem.Name}`,
+          description:
+            firstItem.Description ||
+            (firstItem["Category - Name"]
+              ? `${firstItem.Name} ${firstItem["Category - Name"]}`
+              : firstItem.Name),
+          featured: false,
+          name: firstItem.Name,
+          status: "published",
+          slug: formattedSlug,
+          tax_category: "tangible",
+          tax_enabled: true,
+          price: priceInCents, // Use price directly on product for simple products
+          sku: firstItem.ID || "",
+          weight: weight,
+          weight_unit: weightUnit,
+          shipping_enabled: true,
+          stock_enabled: stockEnabled,
+          stock: !isNaN(quantity) ? quantity : 0,
+          stock_adjustment: !isNaN(quantity) ? quantity : 0,
+          allow_out_of_stock_purchases: true,
+        },
+      };
+    }
+
+    // If we get here, this is a product with variants
+    console.log(`${firstItem.Name} is a product with variants`);
 
     // Create variant options based on available Option fields from first item
     const variantOptions: SureCartVariantOption[] = [];
@@ -381,25 +519,58 @@ export function formatProductsForSureCart(
       });
     }
 
-    // Parse weight if available (using first item)
-    let weight = 0;
-    if (firstItem.Weight) {
-      weight = parseFloat(firstItem.Weight) || 0;
-    }
+    // Check if stock should be enabled
+    const stockEnabled = items.some(
+      (item) =>
+        item.Quantity !== undefined &&
+        item.Quantity !== null &&
+        item.Quantity !== ""
+    );
+
+    // Calculate total stock across all variants
+    const totalStock = stockEnabled
+      ? items.reduce((sum, item) => {
+          const quantity = parseInt(item.Quantity || "0", 10);
+          return sum + (isNaN(quantity) ? 0 : quantity);
+        }, 0)
+      : 0;
 
     // Create variants array from all items in the group
     const variants: SureCartVariant[] = items.map((item, index) => {
-      const priceString = item["Variant Price"] || "0";
+      // Parse price to cents
       const priceInCents = Math.round(
-        parseFloat(priceString.replace(/[$,]/g, "")) * 100
+        parseFloat(item.Price.replace(/[$,]/g, "")) * 100
       );
+
+      // Extract the first image URL if there are multiple
+      const imageUrls = extractImages(item.Images);
+      const primaryImage = imageUrls.length > 0 ? imageUrls[0] : "";
 
       const variant: SureCartVariant = {
         amount: priceInCents,
-        position: parseInt(item["Order"] || (index + 1).toString(), 10),
-        sku: item["ID"] || "",
-        image: item["Images"] || "",
+        position: parseInt(item.Order || (index + 1).toString(), 10),
+        sku: item.ID || "",
+        image: primaryImage,
       };
+
+      // Store all images in the variant metadata for gallery use
+      if (imageUrls.length > 1) {
+        variant.metadata = variant.metadata || {};
+        variant.metadata.additional_images = imageUrls.slice(1).join(",");
+      }
+
+      // Add stock if available
+      if (item.Quantity) {
+        const quantity = parseInt(item.Quantity, 10);
+        if (!isNaN(quantity)) {
+          variant.stock = quantity;
+          variant.stock_enabled = true;
+          variant.stock_adjustment = quantity;
+        }
+      } else {
+        // If no quantity provided, set stock_adjustment to 0
+        variant.stock_adjustment = 0;
+      }
 
       // Only add option fields that have values
       if (item["Option1 Value"]) {
@@ -422,20 +593,77 @@ export function formatProductsForSureCart(
       product: {
         recurring: false,
         metadata,
-        content: `${firstItem["Category - Name"]} - ${firstItem["Title"]}`,
-        description: `${firstItem["Title"]} ${firstItem["Category - Name"]}`,
+        content: firstItem["Category - Name"]
+          ? `${firstItem["Category - Name"]} - ${firstItem.Name}`
+          : `${firstItem.Name}`,
+        description:
+          firstItem.Description ||
+          (firstItem["Category - Name"]
+            ? `${firstItem.Name} ${firstItem["Category - Name"]}`
+            : firstItem.Name),
         featured: false,
-        name: firstItem["Title"],
+        name: firstItem.Name,
         status: "published",
-        slug: firstItem["Handle"],
+        slug: formattedSlug,
         tax_category: "tangible",
         tax_enabled: true,
         variant_options: variantOptions,
         variants: variants,
         weight: weight,
-        weight_unit: "lb",
+        weight_unit: weightUnit,
         shipping_enabled: true,
+        stock_enabled: stockEnabled,
+        stock: totalStock,
+        allow_out_of_stock_purchases: true,
       },
     };
   });
+}
+
+/**
+ * Checks if a product exists by its slug
+ * @param slug The product slug to check
+ * @returns The product if found, null if not found
+ */
+export async function checkProductExistsBySlug(
+  slug: string
+): Promise<SureCartProductResponse | null> {
+  try {
+    console.log(`Checking if product with slug "${slug}" exists...`);
+    const response: { data: SureCartProductResponse[] } = await fetchSureCart({
+      endpoint: "products",
+      method: "GET",
+      query: {
+        query: slug,
+        limit: 10,
+      },
+    });
+
+    if (
+      response.data &&
+      Array.isArray(response.data) &&
+      response.data.length > 0
+    ) {
+      // Find exact match in returned products
+      const exactMatch = response.data.find(
+        (product: SureCartProductResponse) => product.slug === slug
+      );
+
+      if (exactMatch) {
+        console.log(
+          `Found existing product with slug "${slug}": ${exactMatch.id}`
+        );
+        return exactMatch;
+      }
+    }
+
+    console.log(`No product found with slug "${slug}"`);
+    return null;
+  } catch (error) {
+    console.error(
+      `Error checking if product exists with slug "${slug}":`,
+      error
+    );
+    return null;
+  }
 }

@@ -37,21 +37,27 @@ export type SureCartProductResponse = {
 export type ProductCSVItem = {
   ID: string;
   Order: string;
-  Handle: string;
-  Title: string;
-  "Category - Name": string;
-  "Category - Slug": string;
+  Slug: string;
+  Name: string;
+  "Category - Slug"?: string;
+  "Category - Slugs"?: string;
+  Description: string;
+  Quantity: string;
   "Option1 Name": string;
   "Option1 Value": string;
   "Option2 Name": string;
   "Option2 Value": string;
   "Option3 Name": string;
   "Option3 Value": string;
-  "Variant Price": string;
+  Price: string;
   Images: string;
-  Gender: string;
   Weight: string;
-  [key: string]: string; // For metadata fields and any other dynamic fields
+  "Weight Unit": string;
+  Length: string;
+  Width: string;
+  Height: string;
+  "Size Unit": string;
+  [key: string]: string | undefined;
 };
 
 export type SureCartMetadata = {
@@ -72,6 +78,9 @@ export type SureCartVariant = {
   sku: string;
   image?: string;
   image_id?: string;
+  stock?: number;
+  stock_enabled?: boolean;
+  stock_adjustment?: number;
   metadata?: {
     [key: string]: string;
   };
@@ -90,11 +99,17 @@ export type SureCartProduct = {
     slug: string;
     tax_category: string;
     tax_enabled: boolean;
-    variant_options: SureCartVariantOption[];
-    variants: SureCartVariant[];
+    variant_options?: SureCartVariantOption[];
+    variants?: SureCartVariant[];
+    price?: number;
     weight: number;
     weight_unit: string;
     shipping_enabled: boolean;
+    stock_enabled?: boolean;
+    stock?: number;
+    stock_adjustment?: number;
+    allow_out_of_stock_purchases?: boolean;
+    product_collections?: string[];
   };
 };
 

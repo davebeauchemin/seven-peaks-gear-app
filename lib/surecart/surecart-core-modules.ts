@@ -35,7 +35,7 @@ export async function createSureCartMedia(media: {
     console.log(`Processing media from URL: ${media.url}`);
 
     // Extract filename from URL
-    const fileName = media.url.split("/").pop() || "image.jpg";
+    const fileName = media.url.split("/").pop()?.split("?")[0] || "image.jpg";
 
     // Check if an image with this filename already exists
     // This will throw an error if the SureCart HappyFiles category doesn't exist
@@ -99,51 +99,104 @@ export async function createSureCartMedia(media: {
       `Will assign uploaded media to SureCart HappyFiles category ID: ${sureCartCategoryId}`
     );
 
-    // Fetch the image data from the URL
-    const response = await fetch(media.url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image from URL: ${media.url}`);
+    // Download the image with retry logic
+    let imageBuffer: Buffer | null = null;
+    let contentType = "image/jpeg"; // Default content type
+    const MAX_RETRIES = 3;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(
+          `Downloading image from ${media.url} (attempt ${attempt}/${MAX_RETRIES})`
+        );
+
+        // Download with a timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        const response = await fetch(media.url, {
+          signal: controller.signal,
+          headers: {
+            "User-Agent": "Seven-Peaks-Gear-App/1.0",
+          },
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch image: ${response.status} ${response.statusText}`
+          );
+        }
+
+        // Get content type from response headers
+        contentType = response.headers.get("content-type") || "image/jpeg";
+
+        // Get the image data as ArrayBuffer and convert to Buffer
+        const arrayBuffer = await response.arrayBuffer();
+        imageBuffer = Buffer.from(arrayBuffer);
+
+        console.log(
+          `Successfully downloaded image (${imageBuffer.length} bytes)`
+        );
+        break; // Success, exit the retry loop
+      } catch (downloadError: any) {
+        console.error(`Download attempt ${attempt} failed:`, downloadError);
+        if (attempt === MAX_RETRIES) {
+          throw new Error(
+            `Failed to download image after ${MAX_RETRIES} attempts: ${downloadError.message}`
+          );
+        }
+        // Wait before retrying (exponential backoff)
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 * Math.pow(2, attempt - 1))
+        );
+      }
     }
 
-    // Get the image data as ArrayBuffer and convert to Buffer
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const contentType = response.headers.get("content-type") || "image/jpeg";
+    if (!imageBuffer) {
+      throw new Error("Failed to download image: Buffer is null");
+    }
 
-    console.log("Uploading media to WordPress");
+    console.log(`Uploading media to WordPress (${imageBuffer.length} bytes)`);
 
-    // Create FormData for WordPress upload
-    const formData = new FormData();
-    formData.append(
-      "file",
-      new Blob([buffer], { type: contentType }),
-      fileName
-    );
+    // Determine the correct file extension and MIME type
+    const fileExtension = fileName.split(".").pop()?.toLowerCase() || "jpg";
+    const mimeMap: Record<string, string> = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      webp: "image/webp",
+      svg: "image/svg+xml",
+    };
+    const detectedMimeType = mimeMap[fileExtension] || contentType;
 
-    // Upload to WordPress with metadata
-    const uploadImage = await fetch(
-      process.env.WP_URL! + "/wp-json/wp/v2/media",
+    // Upload directly to WordPress using the buffer
+    const uploadResponse = await fetch(
+      `${process.env.WP_URL!}/wp-json/wp/v2/media`,
       {
         method: "POST",
         headers: {
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+          "Content-Type": detectedMimeType,
           Authorization:
             "Basic " +
             Buffer.from(
               `${process.env.WP_USERNAME!}:${process.env.WP_APP_PASSWORD!}`
             ).toString("base64"),
-          "Content-Disposition": `attachment; filename="${fileName}"`,
         },
-        body: formData,
+        body: imageBuffer,
       }
     );
 
-    if (!uploadImage.ok) {
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
       throw new Error(
-        `Failed to upload image to WordPress: ${await uploadImage.text()}`
+        `Failed to upload image to WordPress: ${uploadResponse.status} ${errorText}`
       );
     }
 
-    const wpMediaData = await uploadImage.json();
+    const wpMediaData = await uploadResponse.json();
     let updatedMedia = wpMediaData;
 
     // Prepare metadata updates - combine HappyFiles category and variant option
@@ -158,44 +211,65 @@ export async function createSureCartMedia(media: {
         `Assigning media ID ${updatedMedia.id} to HappyFiles category ${sureCartCategoryId}`
       );
 
-      // Format the HappyFiles category ID as required by the API
-      // The API expects happyfiles_category to be an array of term IDs
-      const updateResponse = await fetch(
-        `${process.env.WP_URL!}/wp-json/wp/v2/media/${updatedMedia.id}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization:
-              "Basic " +
-              Buffer.from(
-                `${process.env.WP_USERNAME!}:${process.env.WP_APP_PASSWORD!}`
-              ).toString("base64"),
-          },
-          body: JSON.stringify({
-            happyfiles_category: [sureCartCategoryId],
-            meta: metaUpdates,
-          }),
-        }
-      );
+      // Add retry logic for category assignment
+      let categoryAssigned = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          // Format the HappyFiles category ID as required by the API
+          // The API expects happyfiles_category to be an array of term IDs
+          const updateResponse = await fetch(
+            `${process.env.WP_URL!}/wp-json/wp/v2/media/${updatedMedia.id}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization:
+                  "Basic " +
+                  Buffer.from(
+                    `${process.env.WP_USERNAME!}:${process.env.WP_APP_PASSWORD!}`
+                  ).toString("base64"),
+              },
+              body: JSON.stringify({
+                happyfiles_category: [sureCartCategoryId],
+                meta: metaUpdates,
+              }),
+            }
+          );
 
-      if (!updateResponse.ok) {
-        console.error(
-          `Failed to assign HappyFiles category: ${updateResponse.status}`
+          if (!updateResponse.ok) {
+            throw new Error(
+              `Failed to assign HappyFiles category: ${updateResponse.status}`
+            );
+          }
+
+          updatedMedia = await updateResponse.json();
+          console.log(`Successfully assigned media to HappyFiles category`);
+          categoryAssigned = true;
+          break;
+        } catch (updateError) {
+          console.error(
+            `Category assignment attempt ${attempt} failed:`,
+            updateError
+          );
+          if (attempt === 3) {
+            // Use the media even without category assignment
+            console.warn("Proceeding with media without category assignment");
+            break;
+          }
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+
+      if (!categoryAssigned) {
+        console.warn(
+          `Failed to assign HappyFiles category after 3 attempts, but continuing with the uploaded media`
         );
-        console.error(await updateResponse.text());
-        throw new Error(
-          `Failed to assign media to SureCart HappyFiles category`
-        );
-      } else {
-        updatedMedia = await updateResponse.json();
-        console.log(`Successfully assigned media to HappyFiles category`);
       }
     } catch (categoryError) {
       console.error("Error assigning HappyFiles category:", categoryError);
-      throw new Error(
-        `Failed to assign media to SureCart HappyFiles category: ${categoryError}`
-      );
+      // Continue with the upload even if category assignment fails
+      console.warn("Continuing with media despite category assignment failure");
     }
 
     console.log(
@@ -203,8 +277,6 @@ export async function createSureCartMedia(media: {
     );
 
     // Return media data that can be used with SureCart product variant
-    // When creating/updating the product variant, use:
-    // metadata: { wp_media: mediaResponse.id }
     return {
       id: updatedMedia.id,
       source_url: updatedMedia.source_url,

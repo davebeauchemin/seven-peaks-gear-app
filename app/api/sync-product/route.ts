@@ -4,6 +4,8 @@ import { createSureCartMedia } from "@/lib/surecart/surecart-core-modules";
 import {
   ProductCSVItem,
   SureCartProductCollectionResponse,
+  SureCartProductResponse,
+  SureCartVariant,
 } from "@/types/types";
 import {
   createSureCartProduct,
@@ -11,13 +13,24 @@ import {
   deleteAllSureCartProducts,
   deleteAllProductVariants,
   formatProductsForSureCart,
+  getSureCartProducts,
+  updateSureCartProduct,
+  checkProductExistsBySlug,
 } from "@/lib/surecart/surecart-products";
 import {
   createProductCollection,
   getProductCollections,
+  deleteAllProductCollections,
 } from "@/lib/surecart/surecart-collections";
 import { getSureCartHappyFilesId } from "@/lib/surecart/surecart-media";
 import { isValidImageUrl } from "@/lib/media-utility";
+import fs from "fs";
+import path from "path";
+
+// Build Google Sheets CSV export URL from sheetId and gid
+function buildSheetsUrl(sheetId: string, gid: string): string {
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+}
 
 // Collection item type from CSV
 export interface CollectionCSVItem {
@@ -40,37 +53,519 @@ export interface CollectionCSVItem {
   "Metafield: field_key": string;
 }
 
+// Extract images from comma-separated string
+function extractImages(imageString: string | null | undefined): string[] {
+  if (!imageString) return [];
+
+  return imageString
+    .split(",")
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0);
+}
+
+// Extract category slugs from comma-separated string
+function extractCategorySlugs(
+  categoryString: string | null | undefined
+): string[] {
+  if (!categoryString) return [];
+
+  console.log(`Extracting category slugs from: "${categoryString}"`);
+  const slugs = categoryString
+    .split(",")
+    .map((slug) => slug.trim())
+    .filter((slug) => slug.length > 0);
+
+  console.log(`Found ${slugs.length} slugs: ${slugs.join(", ")}`);
+  return slugs;
+}
+
+// Format a readable name from a slug (e.g., "bike-helmets" → "Bike Helmets")
+function formatNameFromSlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+// Normalize a category string to a slug format (e.g., "BIKE HYBRID BIKE" → "bike-hybrid-bike")
+function normalizeToSlug(categoryString: string): string {
+  return categoryString
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+// Save errors to a log file
+async function saveErrorsToFile(errors: any[]) {
+  if (errors.length === 0) return null;
+
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:T.]/g, "")
+    .slice(0, 12);
+  const filename = `error-session-${timestamp}.txt`;
+  const filePath = path.join(process.cwd(), "logs", filename);
+
+  // Ensure logs directory exists
+  try {
+    await fs.promises.mkdir(path.join(process.cwd(), "logs"), {
+      recursive: true,
+    });
+  } catch (err) {
+    console.error("Failed to create logs directory:", err);
+  }
+
+  // Write errors to file
+  try {
+    const content = errors
+      .map((err) => JSON.stringify(err, null, 2))
+      .join("\n\n");
+    await fs.promises.writeFile(filePath, content);
+    console.log(`Errors saved to ${filePath}`);
+    return filename;
+  } catch (err) {
+    console.error("Failed to write error log:", err);
+    return null;
+  }
+}
+
+// Find collection by slug with minimal normalization
+function findCollectionBySlug(
+  collectionsMap: Map<string, SureCartProductCollectionResponse>,
+  categorySlug: string
+): SureCartProductCollectionResponse | undefined {
+  console.log(`Looking for collection: "${categorySlug}"`);
+
+  // Try exact match first
+  if (collectionsMap.has(categorySlug)) {
+    console.log(`✅ Found exact match for collection: ${categorySlug}`);
+    return collectionsMap.get(categorySlug);
+  }
+
+  // Try normalized slug only for case and spaces
+  const normalizedSlug = normalizeToSlug(categorySlug);
+  if (normalizedSlug !== categorySlug) {
+    console.log(`Trying normalized slug: ${normalizedSlug}`);
+    if (collectionsMap.has(normalizedSlug)) {
+      console.log(`✅ Found match after normalization: ${normalizedSlug}`);
+      return collectionsMap.get(normalizedSlug);
+    }
+  }
+
+  // If no match found, log available collections for debugging
+  console.log(
+    `❌ No match found for "${categorySlug}" (normalized: "${normalizedSlug}")`
+  );
+
+  // Log closest matches for troubleshooting
+  const closestMatches = Array.from(collectionsMap.keys())
+    .filter(
+      (slug) =>
+        slug.includes(normalizedSlug) ||
+        normalizedSlug.includes(slug) ||
+        slug.toLowerCase() === normalizedSlug.toLowerCase()
+    )
+    .slice(0, 5);
+
+  if (closestMatches.length > 0) {
+    console.log(`Closest matches in available collections:`);
+    closestMatches.forEach((slug) => console.log(`  - ${slug}`));
+  }
+
+  return undefined;
+}
+
+// Log collection assignments for a product
+function logCollectionAssignment(
+  productName: string,
+  collectionIds: string[],
+  collectionsMap: Map<string, SureCartProductCollectionResponse>
+) {
+  if (collectionIds.length === 0) {
+    console.log(`⚠️ Product "${productName}" not assigned to any collections`);
+    return;
+  }
+
+  const collectionNames = collectionIds.map((id) => {
+    const collection = Array.from(collectionsMap.values()).find(
+      (c) => c.id === id
+    );
+    return collection
+      ? `${collection.name} (${collection.slug})`
+      : `Unknown (${id})`;
+  });
+
+  console.log(
+    `✅ Product "${productName}" assigned to ${collectionIds.length} collections:`
+  );
+  collectionNames.forEach((name, i) => console.log(`  ${i + 1}. ${name}`));
+}
+
+// Fetch all collections with pagination
+async function fetchAllCollections(): Promise<
+  SureCartProductCollectionResponse[]
+> {
+  console.log("Starting comprehensive collection fetch with pagination...");
+
+  let allCollections: SureCartProductCollectionResponse[] = [];
+  let page = 1;
+  let hasMorePages = true;
+
+  while (hasMorePages) {
+    console.log(`Fetching collections page ${page}...`);
+    const response = await getProductCollections({
+      limit: 100,
+      page,
+    });
+
+    if (!response.data || response.data.length === 0) {
+      console.log(`No more collections found on page ${page}`);
+      hasMorePages = false;
+      break;
+    }
+
+    console.log(`Found ${response.data.length} collections on page ${page}`);
+    allCollections = [...allCollections, ...response.data];
+
+    // Check if we need to fetch more pages
+    if (response.data.length < 100) {
+      console.log("Reached last page of collections");
+      hasMorePages = false;
+    } else {
+      page++;
+    }
+  }
+
+  console.log(`Total collections fetched: ${allCollections.length}`);
+  return allCollections;
+}
+
 export async function POST(req: NextRequest) {
   try {
     console.log("Sync product request received...");
 
-    // First delete all existing products, media, and variants
-    console.log("Deleting existing data...");
-    await deleteAllSureCartProducts();
-    await deleteAllProductVariants();
-    console.log("Existing data deleted successfully");
+    // Get parameters from request body or use defaults
+    const {
+      sheetId,
+      gid,
+      csvUrl,
+      deleteExisting = false,
+    } = await req.json().catch(() => ({}));
 
-    // STEP 1: Fetch and process product data
-    console.log("Step 1: Fetching and processing product data...");
-    const productData = (await fetchCSVData(
-      process.env.PRODUCTS_FILE_URL!
-    )) as ProductCSVItem[];
+    // Only delete existing products if deleteExisting is true
+    if (deleteExisting) {
+      console.log("Deleting existing data as requested...");
+      await deleteAllSureCartProducts();
+      await deleteAllProductVariants();
+      console.log("Existing data deleted successfully");
+    } else {
+      console.log(
+        "Skipping deletion of existing products (deleteExisting=false)"
+      );
+    }
+
+    // Determine the CSV source - prefer provided CSV URL, then built URL from sheetId/gid, then env variable
+    let dataSourceUrl: string;
+
+    if (csvUrl) {
+      dataSourceUrl = csvUrl;
+      console.log(`Using provided CSV URL: ${dataSourceUrl}`);
+    } else if (sheetId && gid) {
+      dataSourceUrl = buildSheetsUrl(sheetId, gid);
+      console.log(`Using Google Sheet: ${dataSourceUrl}`);
+    } else {
+      dataSourceUrl = process.env.PRODUCTS_FILE_URL!;
+      console.log(
+        `Using default products URL from environment: ${dataSourceUrl}`
+      );
+    }
+
+    // CRITICAL: Fetch ALL collections first with pagination to ensure we have everything
+    console.log("Fetching ALL collections for product association...");
+    const allCollections = await fetchAllCollections();
+
+    // Create a map for quick collection lookup by slug
+    const collectionsMap = new Map<string, SureCartProductCollectionResponse>();
+    allCollections.forEach((collection) => {
+      collectionsMap.set(collection.slug, collection);
+      // Also store lowercase version for case-insensitive matching
+      collectionsMap.set(collection.slug.toLowerCase(), collection);
+    });
+
+    console.log(
+      `Found ${allCollections.length} collections for product mapping`
+    );
+    console.log("Collection slugs available:");
+    Array.from(new Set(allCollections.map((c) => c.slug)))
+      .sort()
+      .forEach((slug) => {
+        console.log(`  - ${slug}`);
+      });
+
+    // Fetch and process product data
+    console.log("Fetching and processing product data...");
+    const productData = (await fetchCSVData(dataSourceUrl)) as ProductCSVItem[];
+    console.log(`Loaded ${productData.length} product variants from CSV`);
+
+    // Debug: Log unique category slugs from CSV
+    const uniqueCategorySlugs = new Set<string>();
+    console.log("Raw CSV data sample:");
+    console.log(JSON.stringify(productData[0], null, 2)); // Log first item to see structure
+
+    // Log all keys to debug
+    const allKeys = new Set<string>();
+    productData.forEach((item) => {
+      Object.keys(item).forEach((key) => allKeys.add(key));
+    });
+    console.log("Available CSV columns:", Array.from(allKeys).join(", "));
+
+    // Now process category slugs
+    productData.forEach((item) => {
+      if (item["Category - Slugs"]) {
+        console.log(
+          `Found Category - Slugs for ${item.Name}: "${item["Category - Slugs"]}"`
+        );
+        const slugs = extractCategorySlugs(item["Category - Slugs"]);
+        slugs.forEach((slug) => uniqueCategorySlugs.add(slug));
+      } else {
+        // Check if the item has the slug in its own slug
+        const productSlug = item.Slug || "";
+        if (productSlug) {
+          // Extract potential category from product slug
+          // Format: most product slugs follow pattern like "product-name-bike-category-subcategory"
+          const slugParts = productSlug.split("-");
+          for (let i = 0; i < slugParts.length - 1; i++) {
+            // Check common patterns like "bike-mountain-bike", "bike-road-bike", etc.
+            if (slugParts[i] === "bike" && i < slugParts.length - 1) {
+              // Try to construct potential category slugs
+              const possibleSlugs = [];
+
+              // Try "bike-category"
+              if (i + 1 < slugParts.length) {
+                possibleSlugs.push(`bike-${slugParts[i + 1]}`);
+              }
+
+              // Try "bike-category-subcategory"
+              if (i + 2 < slugParts.length) {
+                possibleSlugs.push(
+                  `bike-${slugParts[i + 1]}-${slugParts[i + 2]}`
+                );
+              }
+
+              // Try more specific patterns
+              if (slugParts.includes("mountain")) {
+                possibleSlugs.push("bike-mountain-bike");
+              } else if (slugParts.includes("road")) {
+                possibleSlugs.push("bike-road-bike");
+              } else if (slugParts.includes("hybrid")) {
+                possibleSlugs.push("bike-hybrid-bike");
+              } else if (slugParts.includes("electric")) {
+                if (slugParts.includes("mountain")) {
+                  possibleSlugs.push("bike-electric-mountain-bike");
+                } else if (slugParts.includes("road")) {
+                  possibleSlugs.push("bike-electric-road-bike");
+                } else if (slugParts.includes("city")) {
+                  possibleSlugs.push("bike-electric-city-bike");
+                } else {
+                  possibleSlugs.push("bike-electric-road-bike");
+                }
+              } else if (slugParts.includes("junior")) {
+                if (slugParts.includes("mountain")) {
+                  possibleSlugs.push("bike-junior-mountain-bike");
+                } else if (slugParts.includes("hybrid")) {
+                  possibleSlugs.push("bike-junior-hybrid-bike");
+                }
+              } else if (slugParts.includes("kids")) {
+                possibleSlugs.push("bike-kids-bike");
+              } else if (slugParts.includes("bmx")) {
+                possibleSlugs.push("bike-bmx");
+              }
+
+              if (possibleSlugs.length > 0) {
+                console.log(
+                  `Extracted possible categories from slug ${productSlug}: ${possibleSlugs.join(", ")}`
+                );
+                possibleSlugs.forEach((slug) => uniqueCategorySlugs.add(slug));
+              }
+
+              // No need to continue checking this product
+              break;
+            }
+          }
+        }
+      }
+    });
+
+    console.log("Category slugs in CSV data:");
+    Array.from(uniqueCategorySlugs)
+      .sort()
+      .forEach((slug) => {
+        const exists =
+          collectionsMap.has(slug) || collectionsMap.has(slug.toLowerCase());
+        console.log(`  - ${slug} (${exists ? "FOUND" : "NOT FOUND"})`);
+      });
+
+    // Pre-process the product data to assign collections before formatting
+    console.log("Pre-processing products to assign collections...");
+    const productCollectionMap = new Map<string, string[]>();
+
+    // First pass: extract all collection slugs for each product
+    productData.forEach((item) => {
+      const collectionIds: string[] = [];
+
+      // First try to get from Category - Slugs
+      if (item["Category - Slugs"]) {
+        console.log(
+          `Using Category - Slugs for ${item.Name}: "${item["Category - Slugs"]}"`
+        );
+        const slugs = extractCategorySlugs(item["Category - Slugs"]);
+
+        // Map slugs to collection IDs
+        slugs.forEach((slug) => {
+          // Try direct match
+          let collection = collectionsMap.get(slug);
+
+          // Try lowercase match if direct match fails
+          if (!collection) {
+            collection = collectionsMap.get(slug.toLowerCase());
+          }
+
+          if (collection) {
+            collectionIds.push(collection.id);
+            console.log(
+              `✅ Mapped slug '${slug}' to collection ID ${collection.id} (${collection.name})`
+            );
+          } else {
+            console.warn(`❌ No collection found for slug: ${slug}`);
+          }
+        });
+      } else {
+        // Extract from the product slug as fallback
+        const productSlug = item.Slug || "";
+        if (productSlug) {
+          // Extract potential category from product slug
+          const slugParts = productSlug.split("-");
+          for (let i = 0; i < slugParts.length - 1; i++) {
+            // Check common patterns
+            if (slugParts[i] === "bike" && i < slugParts.length - 1) {
+              // Try to construct potential category slugs
+              const possibleSlugs = [];
+
+              // Similar logic as above to extract potential category slugs
+              // Try "bike-category"
+              if (i + 1 < slugParts.length) {
+                possibleSlugs.push(`bike-${slugParts[i + 1]}`);
+              }
+
+              // Try "bike-category-subcategory"
+              if (i + 2 < slugParts.length) {
+                possibleSlugs.push(
+                  `bike-${slugParts[i + 1]}-${slugParts[i + 2]}`
+                );
+              }
+
+              // Try specific category patterns
+              if (slugParts.includes("mountain")) {
+                possibleSlugs.push("bike-mountain-bike");
+              } else if (slugParts.includes("road")) {
+                possibleSlugs.push("bike-road-bike");
+              } else if (slugParts.includes("hybrid")) {
+                possibleSlugs.push("bike-hybrid-bike");
+              } else if (slugParts.includes("electric")) {
+                if (slugParts.includes("mountain")) {
+                  possibleSlugs.push("bike-electric-mountain-bike");
+                } else if (slugParts.includes("road")) {
+                  possibleSlugs.push("bike-electric-road-bike");
+                } else if (slugParts.includes("city")) {
+                  possibleSlugs.push("bike-electric-city-bike");
+                } else {
+                  possibleSlugs.push("bike-electric-road-bike");
+                }
+              } else if (slugParts.includes("junior")) {
+                if (slugParts.includes("mountain")) {
+                  possibleSlugs.push("bike-junior-mountain-bike");
+                } else if (slugParts.includes("hybrid")) {
+                  possibleSlugs.push("bike-junior-hybrid-bike");
+                }
+              } else if (slugParts.includes("kids")) {
+                possibleSlugs.push("bike-kids-bike");
+              } else if (slugParts.includes("bmx")) {
+                possibleSlugs.push("bike-bmx");
+              }
+
+              // Try to find collection IDs for possible slugs
+              for (const slug of possibleSlugs) {
+                // Try direct match
+                let collection = collectionsMap.get(slug);
+
+                // Try lowercase match if direct match fails
+                if (!collection) {
+                  collection = collectionsMap.get(slug.toLowerCase());
+                }
+
+                if (collection) {
+                  collectionIds.push(collection.id);
+                  console.log(
+                    `✅ Inferred collection '${slug}' for ${item.Name} from product slug, ID: ${collection.id} (${collection.name})`
+                  );
+
+                  // Once we found a valid collection, we can stop
+                  break;
+                }
+              }
+
+              // No need to continue checking this product
+              break;
+            }
+          }
+        }
+      }
+
+      if (collectionIds.length > 0) {
+        productCollectionMap.set(item.Slug, collectionIds);
+        console.log(
+          `Product ${item.Name} (${item.Slug}) will be assigned to ${collectionIds.length} collections`
+        );
+      } else {
+        console.warn(
+          `No collections found for product ${item.Name} (${item.Slug})`
+        );
+      }
+    });
+
+    // Summary of collection mapping
+    console.log(
+      `Successfully mapped ${productCollectionMap.size} products to collections`
+    );
 
     // Format the products for SureCart
     const formattedProducts = formatProductsForSureCart(productData);
 
-    // Get existing collections to map products to collections
-    console.log("Fetching existing collections for product association...");
-    const { data: existingCollections } = await getProductCollections();
-    const collectionsMap = new Map<string, SureCartProductCollectionResponse>();
-
-    existingCollections.forEach((collection) => {
-      collectionsMap.set(collection.slug, collection);
+    // Second pass: add collection IDs to formatted products
+    formattedProducts.forEach(({ product }) => {
+      const collectionIds = productCollectionMap.get(product.slug);
+      if (collectionIds && collectionIds.length > 0) {
+        // Clone the array to avoid any reference issues
+        product.product_collections = [...collectionIds];
+        console.log(
+          `Assigned product ${product.name} to ${collectionIds.length} collections: [${collectionIds.join(", ")}]`
+        );
+      } else {
+        console.warn(
+          `No collections assigned to product ${product.name} (${product.slug})`
+        );
+      }
     });
 
-    console.log(
-      `Found ${existingCollections.length} existing collections for product mapping`
-    );
+    // Keep track of collection assignment errors
+    const collectionErrors: Array<{
+      productName: string;
+      productSlug: string;
+      categorySlug: string;
+      normalizedSlug: string;
+      message: string;
+    }> = [];
 
     // STEP 2: Get all existing media in the SureCart HappyFiles folder
     console.log("Step 2: Fetching all existing media in SureCart folder...");
@@ -93,15 +588,61 @@ export async function POST(req: NextRequest) {
     for (const { product } of formattedProducts) {
       const variantsWithImages: Array<{ variant: any; imageUrl: string }> = [];
 
-      for (const variant of product.variants) {
-        if (variant.image) {
-          allImageUrls.add(variant.image);
-          variantsWithImages.push({ variant, imageUrl: variant.image });
+      // Check if this product has variants (for simple products it won't)
+      if (product.variants && Array.isArray(product.variants)) {
+        for (const variant of product.variants) {
+          if (variant.image) {
+            // Split comma-separated image URLs
+            const imageUrls = extractImages(variant.image);
+
+            // Use the first image for each variant
+            if (imageUrls.length > 0) {
+              const primaryImage = imageUrls[0];
+              allImageUrls.add(primaryImage);
+              variantsWithImages.push({ variant, imageUrl: primaryImage });
+
+              // Add any additional images to the product gallery
+              for (let i = 1; i < imageUrls.length; i++) {
+                allImageUrls.add(imageUrls[i]);
+              }
+            }
+          }
+        }
+      }
+      // For simple products, check if there's a primary image in metadata
+      else if (product.metadata && product.metadata.primary_image) {
+        const primaryImage = product.metadata.primary_image;
+        allImageUrls.add(primaryImage);
+
+        // Create a dummy variant entry for the primary image to ensure the product is processed
+        variantsWithImages.push({
+          variant: { metadata: {} },
+          imageUrl: primaryImage,
+        });
+
+        // Add additional images from metadata if available
+        if (product.metadata.additional_images) {
+          const additionalImages = extractImages(
+            product.metadata.additional_images
+          );
+          for (const imageUrl of additionalImages) {
+            allImageUrls.add(imageUrl);
+          }
         }
       }
 
       if (variantsWithImages.length > 0) {
         productImageData.push({ product, variantsWithImages });
+      } else if (
+        product.price &&
+        (!product.variants || !product.variants.length)
+      ) {
+        // If this is a simple product with no images, still include it for processing
+        console.log(`Adding simple product with no images: ${product.name}`);
+        productImageData.push({
+          product,
+          variantsWithImages: [],
+        });
       }
     }
 
@@ -119,13 +660,77 @@ export async function POST(req: NextRequest) {
 
     // First map all existing images to their media data
     for (const imageUrl of Array.from(allImageUrls)) {
-      const fileName = imageUrl.split("/").pop() || "";
+      // Extract just the filename without any URL parameters
+      let fileName = imageUrl.split("/").pop() || "";
+      // Remove any URL parameters if present (e.g., ?v=123)
+      fileName = fileName.split("?")[0];
+
+      console.log(`Checking for existing image: ${fileName}`);
+
+      // Try to find an exact match first
       if (existingMediaMap.has(fileName)) {
         // Image already exists, use existing media data
         imageUrlToMediaData.set(imageUrl, existingMediaMap.get(fileName)!);
         console.log(`Image already exists in WordPress: ${fileName}`);
-      } else {
-        // Image doesn't exist, need to upload
+        continue;
+      }
+
+      // If no exact match, try advanced matching techniques
+      const parts = fileName.split(".");
+      const extension = parts.length > 1 ? parts.pop()?.toLowerCase() : "";
+      const basename = parts.join(".");
+
+      // Create alternative patterns to match against
+      const possiblePatterns = [
+        fileName.toLowerCase(), // Lowercase: Image.jpg → image.jpg
+        basename.toLowerCase() + "." + extension, // Lowercase base+ext
+        basename.replace(/-\d+x\d+$/, "") + "." + extension, // Without dimensions
+        basename.replace(/-scaled$/, "") + "." + extension, // Without -scaled suffix
+      ];
+
+      // Check for WordPress numeric suffixes (image-1.jpg, image-2.jpg)
+      const numericSuffixMatch = basename.match(/^(.+)-(\d+)$/);
+      if (numericSuffixMatch) {
+        const baseWithoutNumber = numericSuffixMatch[1];
+        possiblePatterns.push(baseWithoutNumber + "." + extension);
+        possiblePatterns.push(
+          baseWithoutNumber.toLowerCase() + "." + extension
+        );
+      }
+
+      // Try all patterns
+      let found = false;
+      for (const pattern of possiblePatterns) {
+        if (existingMediaMap.has(pattern)) {
+          imageUrlToMediaData.set(imageUrl, existingMediaMap.get(pattern)!);
+          console.log(
+            `Image already exists in WordPress (pattern match: ${pattern}): ${fileName}`
+          );
+          found = true;
+          break;
+        }
+      }
+
+      // If still not found, try case-insensitive matching as fallback
+      if (!found) {
+        const lowerFileName = fileName.toLowerCase();
+        // Convert Map entries to array for iteration (fixes TypeScript error)
+        const existingMediaEntries = Array.from(existingMediaMap.entries());
+        for (const [existingFileName, mediaData] of existingMediaEntries) {
+          if (existingFileName.toLowerCase() === lowerFileName) {
+            imageUrlToMediaData.set(imageUrl, mediaData);
+            console.log(
+              `Image already exists in WordPress (case-insensitive match): ${existingFileName}`
+            );
+            found = true;
+            break;
+          }
+        }
+      }
+
+      // If still not found, it needs to be uploaded
+      if (!found) {
+        console.log(`Image needs to be uploaded: ${fileName}`);
         imageUrlsToUpload.push(imageUrl);
       }
     }
@@ -187,12 +792,31 @@ export async function POST(req: NextRequest) {
 
     // STEP 6: Now process all products with the prepared images and collection assignments
     console.log(
-      "Step 6: Creating products with processed images and collection assignments..."
+      "Step 6: Creating or updating products with processed images and collection assignments..."
     );
     const productCreationResults = [];
+    const skippedProducts = [];
 
     for (const { product, variantsWithImages } of productImageData) {
-      console.log(`Processing product: ${product.name}`);
+      console.log(
+        `\n===== Processing product: ${product.name} (${product.slug}) =====`
+      );
+
+      // Check if product already exists using direct slug query
+      let existingProduct = await checkProductExistsBySlug(product.slug);
+
+      if (existingProduct && !deleteExisting) {
+        console.log(
+          `Product ${product.name} (${product.slug}) already exists with ID ${existingProduct.id}, skipping`
+        );
+        skippedProducts.push({
+          productName: product.name,
+          productId: existingProduct.id,
+          slug: product.slug,
+          skipped: true,
+        });
+        continue;
+      }
 
       // Track gallery images for this product
       const galleryImageIds: string[] = [];
@@ -200,6 +824,56 @@ export async function POST(req: NextRequest) {
       // Process all variants with their images
       const variantMetadataUpdates = [];
 
+      // For simple products, handle image assignment
+      const isSimpleProduct =
+        product.price &&
+        (!product.variants ||
+          !Array.isArray(product.variants) ||
+          product.variants.length === 0);
+
+      if (isSimpleProduct && product.metadata) {
+        console.log(`Processing images for simple product: ${product.name}`);
+
+        // Process primary image
+        if (product.metadata.primary_image) {
+          const primaryImage = product.metadata.primary_image;
+          const mediaData = imageUrlToMediaData.get(primaryImage);
+
+          if (mediaData) {
+            // Store media data in product metadata
+            product.metadata.wp_media_url = mediaData.source_url;
+            product.metadata.wp_media = mediaData.id.toString();
+
+            // Add to gallery
+            if (!galleryImageIds.includes(mediaData.id.toString())) {
+              galleryImageIds.push(mediaData.id.toString());
+            }
+
+            // Remove original URL to prevent it from being sent to the API
+            delete product.metadata.primary_image;
+          }
+        }
+
+        // Process additional images
+        if (product.metadata.additional_images) {
+          const additionalUrls = extractImages(
+            product.metadata.additional_images
+          );
+          for (const additionalUrl of additionalUrls) {
+            const additionalMediaData = imageUrlToMediaData.get(additionalUrl);
+            if (
+              additionalMediaData &&
+              !galleryImageIds.includes(additionalMediaData.id.toString())
+            ) {
+              galleryImageIds.push(additionalMediaData.id.toString());
+            }
+          }
+          // Remove the temporary metadata field
+          delete product.metadata.additional_images;
+        }
+      }
+
+      // Process variant images (for regular products)
       for (const { variant, imageUrl } of variantsWithImages) {
         const mediaData = imageUrlToMediaData.get(imageUrl);
 
@@ -212,6 +886,25 @@ export async function POST(req: NextRequest) {
           // Add to gallery if not already added
           if (!galleryImageIds.includes(mediaData.id.toString())) {
             galleryImageIds.push(mediaData.id.toString());
+          }
+
+          // Process additional images if stored in metadata
+          if (variant.metadata.additional_images) {
+            const additionalUrls = extractImages(
+              variant.metadata.additional_images
+            );
+            for (const additionalUrl of additionalUrls) {
+              const additionalMediaData =
+                imageUrlToMediaData.get(additionalUrl);
+              if (
+                additionalMediaData &&
+                !galleryImageIds.includes(additionalMediaData.id.toString())
+              ) {
+                galleryImageIds.push(additionalMediaData.id.toString());
+              }
+            }
+            // Remove the temporary metadata field
+            delete variant.metadata.additional_images;
           }
 
           // Update variant-specific metadata if needed
@@ -274,102 +967,156 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Find the product's category slug from the original data
-      const originalProductData = productData.find(
-        (p) => p.Handle === product.slug || p.Title === product.name
-      );
+      // Find the product's category slugs from the original data
+      // First try to find by name which is more reliable with the new slug format
+      const originalProductData =
+        productData.find((p) => p.Name === product.name) ||
+        productData.find(
+          (p) => p.Slug === product.slug // Fallback to slug if name doesn't match
+        );
 
-      if (originalProductData && originalProductData["Category - Slug"]) {
-        const categorySlug = originalProductData["Category - Slug"];
-        const categoryName =
-          originalProductData["Category - Name"] || categorySlug;
+      // Will hold all collection IDs to assign to the product
+      const collectionIds: string[] = [];
 
-        // Check if we have this collection in our map by slug
-        let collection = collectionsMap.get(categorySlug);
+      // Handle collection assignments from Category - Slugs
+      if (originalProductData && originalProductData["Category - Slugs"]) {
+        console.log(
+          `Found Category - Slugs: "${originalProductData["Category - Slugs"]}"`
+        );
+        const categorySlugs = extractCategorySlugs(
+          originalProductData["Category - Slugs"]
+        );
 
-        if (!collection) {
-          // Check if a collection with the same name already exists
-          const existingCollectionWithSameName = Array.from(
-            collectionsMap.values()
-          ).find((c) => c.name.toLowerCase() === categoryName.toLowerCase());
+        if (categorySlugs.length > 0) {
+          console.log(
+            `Processing ${categorySlugs.length} category slugs for "${product.name}"`
+          );
 
-          if (existingCollectionWithSameName) {
-            // Use the existing collection with the same name
-            collection = existingCollectionWithSameName;
-            console.log(
-              `Found collection with same name for ${categoryName}. Using existing collection: ${collection.name} (${collection.slug})`
-            );
-          } else {
-            // If collection not found, attempt to create it and then assign
-            console.log(
-              `Collection not found for ${categorySlug}, creating it now...`
-            );
-            try {
-              const newCollection = await createProductCollection({
-                name: categoryName,
-                slug: categorySlug,
-                description: `Products in the ${categoryName} category`,
+          // Process each category slug
+          for (const categorySlug of categorySlugs) {
+            // Check if we have this collection in our map by slug
+            let collection = findCollectionBySlug(collectionsMap, categorySlug);
+
+            if (!collection) {
+              // If collection not found, log error
+              const errorMessage = `Collection not found for "${categorySlug}". Product will not be assigned to this collection.`;
+              console.warn(errorMessage);
+
+              // Record the error for logging
+              collectionErrors.push({
+                productName: product.name,
+                productSlug: product.slug,
+                categorySlug,
+                normalizedSlug: normalizeToSlug(categorySlug),
+                message: `Collection with slug "${categorySlug}" or normalized slug "${normalizeToSlug(categorySlug)}" does not exist`,
               });
 
-              // Add the new collection to our map
-              collectionsMap.set(categorySlug, newCollection);
-              collection = newCollection;
+              // Continue to next category
+              continue;
+            }
 
+            // If we have a collection, add it to our collection IDs (if not already added)
+            if (!collectionIds.includes(collection.id)) {
+              collectionIds.push(collection.id);
               console.log(
-                `Created new collection: ${newCollection.name} (${categorySlug})`
+                `Will assign product "${product.name}" to collection "${collection.name}" (${collection.slug})`
               );
-            } catch (collectionError: any) {
-              console.error(
-                `Failed to create collection for ${categorySlug}:`,
-                collectionError.message
-              );
-
-              // If creation failed, try to find an existing collection with this name
-              console.log(
-                `Attempting to find existing collection with name: ${categoryName}`
-              );
-              const { data: nameMatchCollections } =
-                await getProductCollections({
-                  search: categoryName,
-                });
-
-              if (nameMatchCollections && nameMatchCollections.length > 0) {
-                // Use the first matching collection
-                collection = nameMatchCollections[0];
-                // Add to our map for future use
-                collectionsMap.set(categorySlug, collection);
-                console.log(
-                  `Using existing collection: ${collection.name} (${collection.slug})`
-                );
-              }
             }
           }
+        } else {
+          console.warn(`No category slugs found for product "${product.name}"`);
         }
+      } else {
+        console.warn(`No Category - Slugs found for product "${product.name}"`);
+      }
 
-        // If we have a collection (either found or created), assign it to the product
-        if (collection) {
-          // Add collection ID directly to product_collections field instead of metadata
-          product.product_collections = [collection.id];
-          console.log(
-            `Assigned product ${product.name} to collection ${collection.name} (${collection.slug})`
-          );
-        }
+      // If we found at least one collection, assign all collections to the product
+      if (collectionIds.length > 0) {
+        product.product_collections = collectionIds;
+        logCollectionAssignment(product.name, collectionIds, collectionsMap);
+      } else {
+        console.warn(`No collections found for product "${product.name}"`);
       }
 
       try {
-        // Create the product in SureCart
-        const createProductResponse = await createSureCartProduct(product);
-        console.log(`Product created: ${createProductResponse.id}`);
+        // Create or update the product in SureCart
+        let productResponse;
+
+        if (existingProduct) {
+          // For existing products, ensure all variants have stock_adjustment set
+          if (product.variants && Array.isArray(product.variants)) {
+            product.variants = product.variants.map(
+              (variant: SureCartVariant) => {
+                // If stock is enabled, ensure stock_adjustment is set
+                if (variant.stock_enabled && variant.stock !== undefined) {
+                  return {
+                    ...variant,
+                    stock_adjustment: variant.stock, // Set stock_adjustment to match the stock quantity
+                  };
+                } else {
+                  // If no stock data, ensure stock_adjustment is 0
+                  return {
+                    ...variant,
+                    stock_adjustment: 0,
+                  };
+                }
+              }
+            );
+          }
+
+          // Now update the product
+          productResponse = await updateSureCartProduct(
+            existingProduct.id,
+            product
+          );
+          console.log(`Product updated: ${productResponse.id}`);
+        } else {
+          // Otherwise create a new product
+          console.log(
+            `Creating ${isSimpleProduct ? "simple" : "variable"} product: ${product.name}`
+          );
+          console.log(
+            isSimpleProduct
+              ? `Simple product with price: ${product.price} cents`
+              : `Variable product with ${product.variants?.length || 0} variants`
+          );
+
+          if (isSimpleProduct) {
+            // For simple products, show exactly what we're sending to the API
+            console.log("Simple product data:", {
+              name: product.name,
+              slug: product.slug,
+              price: product.price,
+              hasVariants: !!product.variants,
+              variantsLength: product.variants?.length || 0,
+            });
+          }
+
+          productResponse = await createSureCartProduct(product);
+          console.log(`Product created: ${productResponse.id}`);
+        }
 
         // Calculate the lowest price from all variants
-        const lowestPrice = findLowestPriceInCents(product.variants);
-        console.log(`Lowest price for ${product.name}: ${lowestPrice} cents`);
+        let lowestPrice = 0;
+        if (product.price) {
+          // For simple products, use the product price directly
+          lowestPrice = product.price;
+          console.log(
+            `Simple product price for ${product.name}: ${lowestPrice} cents`
+          );
+        } else {
+          // For variable products, find the lowest price from variants
+          lowestPrice = findLowestPriceInCents(product.variants);
+          console.log(
+            `Lowest variant price for ${product.name}: ${lowestPrice} cents`
+          );
+        }
 
         // Create the product price (needed for cart functionality)
         if (lowestPrice > 0) {
           try {
             const priceResponse = await createSureCartProductPrice(
-              createProductResponse.id,
+              productResponse.id,
               lowestPrice
             );
             console.log(
@@ -389,12 +1136,13 @@ export async function POST(req: NextRequest) {
 
         productCreationResults.push({
           productName: product.name,
-          productId: createProductResponse.id,
+          productId: productResponse.id,
           success: true,
+          action: existingProduct ? "updated" : "created",
         });
       } catch (productError: any) {
         console.error(
-          `Failed to create product ${product.name}:`,
+          `Failed to ${existingProduct ? "update" : "create"} product ${product.name}:`,
           productError.message,
           productError.status,
           productError.details ? JSON.stringify(productError.details) : ""
@@ -403,26 +1151,43 @@ export async function POST(req: NextRequest) {
           productName: product.name,
           success: false,
           error: productError.message,
+          action: existingProduct ? "update" : "create",
         });
       }
+    }
+
+    // Save collection errors to a file if any occurred
+    let errorLogFile = null;
+    if (collectionErrors.length > 0) {
+      errorLogFile = await saveErrorsToFile(collectionErrors);
     }
 
     // Ensure everything is complete before returning
     console.log("Product sync completed");
     console.log(
-      `Created ${productCreationResults.filter((r) => r.success).length}/${productCreationResults.length} products successfully`
+      `Created/Updated ${productCreationResults.filter((r) => r.success).length}/${productCreationResults.length} products successfully`
     );
+    console.log(`Skipped ${skippedProducts.length} existing products`);
 
     // Only now return the response
     return NextResponse.json({
       success: true,
       message: "Product sync completed",
       summary: {
-        totalProducts: productCreationResults.length,
+        totalProducts: productCreationResults.length + skippedProducts.length,
         successfulProducts: productCreationResults.filter((r) => r.success)
           .length,
+        skippedProducts: skippedProducts.length,
         totalImages: allImageUrls.size,
         uploadedImages: imageUrlsToUpload.length,
+        dataSource: csvUrl
+          ? "custom_csv_url"
+          : sheetId && gid
+            ? `google_sheet_${sheetId}`
+            : "default_env_config",
+        deleteExisting,
+        collectionErrors: collectionErrors.length,
+        errorLogFile,
       },
     });
   } catch (error: any) {
@@ -446,8 +1211,10 @@ export async function POST(req: NextRequest) {
 /**
  * Find the lowest price in cents from an array of variants
  */
-function findLowestPriceInCents(variants: Array<{ amount: number }>): number {
-  if (!variants || variants.length === 0) {
+function findLowestPriceInCents(
+  variants: Array<{ amount: number }> | null | undefined
+): number {
+  if (!variants || !Array.isArray(variants) || variants.length === 0) {
     return 0;
   }
 
@@ -472,6 +1239,7 @@ async function fetchAllExistingMedia(): Promise<
   Map<string, { id: number; source_url: string }>
 > {
   const mediaMap = new Map<string, { id: number; source_url: string }>();
+  const debugActive = true; // Set to true to enable detailed debug logs
 
   try {
     // Get the SureCart HappyFiles category ID
@@ -481,7 +1249,9 @@ async function fetchAllExistingMedia(): Promise<
     // Fetch all media in the category
     let page = 1;
     let hasMoreItems = true;
+    const allMedia = []; // Store all media items for secondary processing
 
+    // First pass: Collect all media items
     while (hasMoreItems) {
       const mediaUrl = new URL(`${process.env.WP_URL!}/wp-json/wp/v2/media`);
       mediaUrl.searchParams.append(
@@ -517,18 +1287,75 @@ async function fetchAllExistingMedia(): Promise<
         break;
       }
 
-      // Map each media item by its filename
-      for (const item of media) {
-        const filename = item.source_url.split("/").pop() || "";
-        mediaMap.set(filename, {
-          id: item.id,
-          source_url: item.source_url,
-        });
-      }
-
+      // Add items to our collection
+      allMedia.push(...media);
       console.log(`Fetched ${media.length} media items from page ${page}`);
       page++;
     }
+
+    console.log(`Total media items fetched: ${allMedia.length}`);
+
+    // Second pass: Process all media items and create lookup maps
+    for (const item of allMedia) {
+      try {
+        // Get and clean the full filename
+        let fullFilename = item.source_url.split("/").pop() || "";
+
+        // Store full filename (without URL parameters)
+        const fullFilenameClean = fullFilename.split("?")[0];
+
+        // Extract basename (name without extension) and extension
+        const parts = fullFilenameClean.split(".");
+        const extension = parts.length > 1 ? parts.pop()?.toLowerCase() : "";
+        const basename = parts.join(".");
+
+        // WordPress often adds -scaled, -300x200, etc to filenames
+        // These patterns help us identify variations of the same image
+        const patterns = [
+          fullFilenameClean, // Original: image.jpg
+          fullFilenameClean.toLowerCase(), // Lowercase: image.jpg → image.jpg
+          basename.toLowerCase() + "." + extension, // Lowercase base+ext: Image.JPG → image.jpg
+          basename.replace(/-\d+x\d+$/, "") + "." + extension, // Remove dimensions: image-300x200.jpg → image.jpg
+          basename.replace(/-scaled$/, "") + "." + extension, // Remove -scaled: image-scaled.jpg → image.jpg
+        ];
+
+        // WordPress might add a numeric suffix for duplicates
+        // Try to match patterns like: image-1.jpg, image-2.jpg, etc.
+        const numericSuffixMatch = basename.match(/^(.+)-(\d+)$/);
+        if (numericSuffixMatch) {
+          const baseWithoutNumber = numericSuffixMatch[1];
+          patterns.push(baseWithoutNumber + "." + extension);
+          patterns.push(baseWithoutNumber.toLowerCase() + "." + extension);
+        }
+
+        // Additional debug info
+        if (debugActive) {
+          console.log(`Processing media item: ${item.id}`);
+          console.log(`  URL: ${item.source_url}`);
+          console.log(`  Filename: ${fullFilenameClean}`);
+          console.log(`  Base: ${basename}, Extension: ${extension}`);
+          console.log(`  Patterns: ${patterns.join(", ")}`);
+        }
+
+        // Store all variants in the map for lookup
+        const uniquePatterns = Array.from(new Set(patterns)); // Convert to array first to avoid TypeScript error
+        for (const pattern of uniquePatterns) {
+          if (!mediaMap.has(pattern)) {
+            mediaMap.set(pattern, {
+              id: item.id,
+              source_url: item.source_url,
+            });
+          } else if (debugActive) {
+            console.log(`  Pattern already exists in map: ${pattern}`);
+          }
+        }
+      } catch (itemError) {
+        console.error(`Error processing media item ${item.id}:`, itemError);
+        // Continue with next item
+      }
+    }
+
+    console.log(`Mapped ${mediaMap.size} media filename patterns`);
   } catch (error) {
     console.error("Error fetching existing media:", error);
   }
@@ -537,7 +1364,28 @@ async function fetchAllExistingMedia(): Promise<
 }
 
 export async function DELETE(req: NextRequest) {
-  await deleteAllSureCartProducts();
-  await deleteAllProductVariants();
-  return NextResponse.json({ success: true, message: "Products deleted" });
+  console.log("Starting complete product data deletion process...");
+
+  // Delete all products
+  console.log("Deleting all products...");
+  const productsResult = await deleteAllSureCartProducts();
+
+  // Delete all product variants
+  console.log("Deleting all product variants...");
+  const variantsResult = await deleteAllProductVariants();
+
+  // Delete all product collections
+  console.log("Deleting all product collections...");
+  const collectionsResult = await deleteAllProductCollections();
+
+  return NextResponse.json({
+    success: true,
+    message: "Products and collections deleted",
+    details: {
+      products: productsResult.success,
+      variants: variantsResult.success,
+      collections: collectionsResult.success,
+      collectionsDeleted: collectionsResult.count || 0,
+    },
+  });
 }
