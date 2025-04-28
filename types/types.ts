@@ -57,6 +57,7 @@ export type ProductCSVItem = {
   Width: string;
   Height: string;
   "Size Unit": string;
+  Featured?: string;
   [key: string]: string | undefined;
 };
 
@@ -121,6 +122,8 @@ export type SureCartProductCollectionResponse = {
   name: string;
   slug: string;
   description?: string;
+  short_description?: string;
+  images?: string[];
   position?: number;
   metadata?: {
     parent_collection?: string;
@@ -133,6 +136,8 @@ export type SureCartProductCollection = {
   name: string;
   slug?: string;
   description?: string;
+  short_description?: string;
+  images?: string[];
   position?: number;
   metadata?: {
     parent_collection?: string;

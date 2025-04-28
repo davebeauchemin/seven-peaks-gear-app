@@ -7,6 +7,12 @@ import {
 } from "@/lib/surecart/surecart-collections";
 import { SureCartProductCollectionResponse } from "@/types/types";
 import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Helper function to create a delay
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,15 +30,8 @@ export interface CollectionCSVItem {
   Slug: string; // Using Slug instead of Handle
   Command: string;
   Name: string;
-  "Body HTML": string;
-  "Sort Order": string;
-  "Template Suffix": string;
-  "Updated At": string;
-  Published: string;
-  "Published At": string;
-  "Published Scope": string;
-  "Row #": string;
-  "Top Row": string;
+  Description: string;
+  "Short Description": string; // Added Short Description field
   Images: string;
   "Metadata: field_key": string;
   "Metadata: Parent": string;
@@ -135,6 +134,93 @@ async function fetchAllCollections(): Promise<
 
   console.log(`Total collections fetched: ${allCollections.length}`);
   return allCollections;
+}
+
+// Helper function to process image URLs from a comma-separated string
+function processImageUrls(imagesString: string): string[] {
+  if (!imagesString) return [];
+
+  return imagesString
+    .split(",")
+    .map((url) => url.trim())
+    .filter((url) => url && url.length > 0);
+}
+
+// Helper function to generate a short description based on the main description using AI
+async function generateShortDescription(
+  collectionName: string,
+  mainDescription: string,
+  metadata: Record<string, any> = {}
+): Promise<string> {
+  try {
+    console.log(`Generating short description for: ${collectionName}`);
+
+    // If no main description, return an empty string
+    if (!mainDescription || mainDescription.trim().length === 0) {
+      console.log(
+        `No main description available for ${collectionName}, skipping short description generation`
+      );
+      return "";
+    }
+
+    // Check if we have an OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      console.log(
+        "No OpenAI API key found, using placeholder short description"
+      );
+      return `${collectionName} - Shop our exclusive selection featuring premium quality and performance.`.substring(
+        0,
+        160
+      );
+    }
+
+    // Prepare the prompt for OpenAI
+    const prompt = `
+    You are generating a short, SEO-friendly description for a product collection.
+    
+    Collection Name: ${collectionName}
+    
+    Main Description: ${mainDescription}
+    
+    Additional Metadata: ${JSON.stringify(metadata)}
+    
+    Create a concise, compelling short description (maximum 160 characters) that captures the essence of this collection.
+    Include key benefits and appeal but keep it brief.
+    
+    Short Description:`;
+
+    // Use OpenAI to generate the short description
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a skilled e-commerce copywriter specializing in SEO-friendly product descriptions.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      max_tokens: 100,
+      temperature: 0.7,
+    });
+
+    // Extract and clean the generated description
+    const shortDescription =
+      completion.choices[0]?.message?.content?.trim() || "";
+
+    // Ensure it's not too long
+    return shortDescription.substring(0, 160);
+  } catch (error: any) {
+    console.error(`Error generating short description: ${error.message}`);
+    // Fallback to a generic short description on error
+    return `${collectionName} - Shop our exclusive selection.`.substring(
+      0,
+      160
+    );
+  }
 }
 
 // POST: Create all collections from CSV
@@ -267,11 +353,54 @@ export async function POST(req: NextRequest) {
           `Creating new parent collection: ${collection.Name} (${collection.Slug})`
         );
 
+        // Generate a short description if not provided but main description exists
+        if (!collection["Short Description"] && collection["Description"]) {
+          console.log(
+            `No short description provided for ${collection.Name}, generating one...`
+          );
+
+          try {
+            // Extract existing metadata
+            const metadataForAI: Record<string, any> = {};
+            Object.entries(collection).forEach(([key, value]) => {
+              if (key.startsWith("Metadata:") && value) {
+                const fieldName = key.replace("Metadata:", "").trim();
+                metadataForAI[fieldName] = value;
+              }
+            });
+
+            // Generate short description
+            const shortDescription = await generateShortDescription(
+              collection.Name,
+              collection["Description"],
+              metadataForAI
+            );
+
+            if (shortDescription) {
+              console.log(
+                `Generated short description for ${collection.Name}: ${shortDescription.substring(0, 50)}...`
+              );
+
+              // Store the short description for use in creation
+              collection["Short Description"] = shortDescription;
+            }
+          } catch (error: any) {
+            console.error(
+              `Failed to generate short description for ${collection.Name}: ${error.message}`
+            );
+          }
+        }
+
+        // Process images if available
+        const imageUrls = processImageUrls(collection.Images);
+
         // Create the parent collection with minimal metadata
         const newCollection = await createProductCollection({
           name: collection.Name,
           slug: collection.Slug,
-          description: collection["Body HTML"] || "",
+          description: collection["Description"] || "",
+          short_description: collection["Short Description"] || "",
+          images: imageUrls.length > 0 ? imageUrls : undefined,
         });
 
         console.log(
@@ -335,6 +464,47 @@ export async function POST(req: NextRequest) {
           `Creating new child collection: ${collection.Name} (${collection.Slug}) with parent: ${parentSlug} (${parentCollection.id})`
         );
 
+        // Generate a short description if not provided but main description exists
+        if (!collection["Short Description"] && collection["Description"]) {
+          console.log(
+            `No short description provided for ${collection.Name}, generating one...`
+          );
+
+          try {
+            // Extract existing metadata
+            const metadataForAI: Record<string, any> = {};
+            Object.entries(collection).forEach(([key, value]) => {
+              if (key.startsWith("Metadata:") && value) {
+                const fieldName = key.replace("Metadata:", "").trim();
+                metadataForAI[fieldName] = value;
+              }
+            });
+
+            // Generate short description
+            const shortDescription = await generateShortDescription(
+              collection.Name,
+              collection["Description"],
+              metadataForAI
+            );
+
+            if (shortDescription) {
+              console.log(
+                `Generated short description for ${collection.Name}: ${shortDescription.substring(0, 50)}...`
+              );
+
+              // Store the short description for use in creation
+              collection["Short Description"] = shortDescription;
+            }
+          } catch (error: any) {
+            console.error(
+              `Failed to generate short description for ${collection.Name}: ${error.message}`
+            );
+          }
+        }
+
+        // Process images if available
+        const imageUrls = processImageUrls(collection.Images);
+
         // Create basic child collection with only parent metadata
         const metadata: Record<string, string> = {
           parent_collection: parentSlug,
@@ -345,7 +515,9 @@ export async function POST(req: NextRequest) {
         const newCollection = await createProductCollection({
           name: collection.Name,
           slug: collection.Slug,
-          description: collection["Body HTML"] || "",
+          description: collection["Short Description"] || "",
+          short_description: collection["Short Description"] || "",
+          images: imageUrls.length > 0 ? imageUrls : undefined,
           metadata,
         });
 
@@ -392,6 +564,44 @@ export async function POST(req: NextRequest) {
           console.log(
             `Updating collection: ${collection.Name} (${collection.Slug})`
           );
+
+          // Generate a short description if not provided but main description exists
+          if (!collection["Short Description"] && collection["Description"]) {
+            console.log(
+              `No short description provided for ${collection.Name}, generating one...`
+            );
+
+            try {
+              // Extract existing metadata
+              const metadataForAI: Record<string, any> = {};
+              Object.entries(collection).forEach(([key, value]) => {
+                if (key.startsWith("Metadata:") && value) {
+                  const fieldName = key.replace("Metadata:", "").trim();
+                  metadataForAI[fieldName] = value;
+                }
+              });
+
+              // Generate short description
+              const shortDescription = await generateShortDescription(
+                collection.Name,
+                collection["Description"],
+                metadataForAI
+              );
+
+              if (shortDescription) {
+                console.log(
+                  `Generated short description for ${collection.Name}: ${shortDescription.substring(0, 50)}...`
+                );
+
+                // Store the short description for use in update
+                collection["Short Description"] = shortDescription;
+              }
+            } catch (error: any) {
+              console.error(
+                `Failed to generate short description for ${collection.Name}: ${error.message}`
+              );
+            }
+          }
 
           // Extract metadata, preserving existing values
           const metadata: Record<string, string> = {
@@ -476,7 +686,13 @@ export async function POST(req: NextRequest) {
           });
 
           // Update the collection
+          const imageUrls = processImageUrls(collection.Images);
+
           await updateProductCollection(currentCollection.id, {
+            name: collection.Name,
+            description: collection["Short Description"] || "",
+            short_description: collection["Short Description"] || "",
+            images: imageUrls.length > 0 ? imageUrls : undefined,
             metadata,
           });
 
@@ -707,10 +923,52 @@ export async function PATCH(req: NextRequest) {
       }
     });
 
+    // Generate a short description if not provided but main description exists
+    if (!csvCollection["Short Description"] && csvCollection["Description"]) {
+      console.log(
+        `No short description provided for ${csvCollection.Name}, generating one...`
+      );
+
+      try {
+        // Extract metadata for AI
+        const metadataForAI: Record<string, any> = {};
+        Object.entries(csvCollection).forEach(([key, value]) => {
+          if (key.startsWith("Metadata:") && value) {
+            const fieldName = key.replace("Metadata:", "").trim();
+            metadataForAI[fieldName] = value;
+          }
+        });
+
+        // Generate short description
+        const shortDescription = await generateShortDescription(
+          csvCollection.Name,
+          csvCollection["Description"],
+          metadataForAI
+        );
+
+        if (shortDescription) {
+          console.log(
+            `Generated short description for ${csvCollection.Name}: ${shortDescription.substring(0, 50)}...`
+          );
+
+          // Store the short description for the update
+          csvCollection["Short Description"] = shortDescription;
+        }
+      } catch (error: any) {
+        console.error(
+          `Failed to generate short description for ${csvCollection.Name}: ${error.message}`
+        );
+      }
+    }
+
     // STEP 4: Update the collection
+    const imageUrls = processImageUrls(csvCollection.Images);
+
     await updateProductCollection(collectionId, {
       name: csvCollection.Name,
-      description: csvCollection["Body HTML"] || "",
+      description: csvCollection["Description"] || "",
+      short_description: csvCollection["Short Description"] || "",
+      images: imageUrls.length > 0 ? imageUrls : undefined,
       metadata,
     });
 

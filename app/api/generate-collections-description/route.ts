@@ -3,8 +3,8 @@ import { parse } from "csv-parse";
 import { sheets_v4 } from "@googleapis/sheets";
 import { JWT } from "google-auth-library";
 import {
-  generateProductDescription,
-  generateShortProductDescription,
+  generateCollectionDescription,
+  generateShortCollectionDescription,
 } from "@/lib/openai/openai-utils";
 
 // Helper function to parse CSV data
@@ -57,23 +57,6 @@ function extractImages(imageString: string | null | undefined): string[] {
     .split(",")
     .map((url) => url.trim())
     .filter((url) => url.length > 0);
-}
-
-// Group products by Slug
-function groupProductsBySlug(products: any[]): Map<string, any[]> {
-  const productGroups = new Map<string, any[]>();
-
-  products.forEach((item) => {
-    const slug = item.Slug;
-    if (!slug) return; // Skip items without a slug
-
-    if (!productGroups.has(slug)) {
-      productGroups.set(slug, []);
-    }
-    productGroups.get(slug)!.push(item);
-  });
-
-  return productGroups;
 }
 
 // Initialize Google Sheets API client
@@ -183,7 +166,7 @@ export async function POST(req: NextRequest) {
     // Get sheetId and gid from the request or use defaults
     const {
       sheetId = "1sYH_v8JMNmLkcQYtpHpjxJ19E4wz1gp1hiIkaF5fAWQ",
-      gid = "403190572",
+      gid = "0", // Default to first sheet for collections
       csvUrl,
       forceUpdate = false,
     } = await req.json();
@@ -195,26 +178,23 @@ export async function POST(req: NextRequest) {
 
     // Fetch and parse CSV data
     const csvContent = await fetchCSVData(targetCsvUrl);
-    const products = await parseCSV(csvContent);
+    const collections = await parseCSV(csvContent);
 
-    // Group products by Slug to avoid generating descriptions for each variant
-    const productGroups = groupProductsBySlug(products);
-    console.log(
-      `Found ${products.length} product rows (${productGroups.size} unique products)`
-    );
+    console.log(`Found ${collections.length} collection rows`);
 
     // Store updated descriptions with slug as key for easier spreadsheet updating
-    const productDescriptions = new Map<string, string>();
-    const shortProductDescriptions = new Map<string, string>();
-    const updatedSlugs = new Set<string>(); // Keep track of which products have been updated in the sheet
+    const collectionDescriptions = new Map<string, string>();
+    const shortCollectionDescriptions = new Map<string, string>();
+    const updatedSlugs = new Set<string>(); // Keep track of which collections have been updated in the sheet
 
     // Get the available headers to find the description column
-    const headers = Object.keys(products[0]);
+    const headers = Object.keys(collections[0]);
     const descriptionHeaders = [
       "Description",
       "Body HTML",
       "description",
       "body_html",
+      "Body",
     ];
     let descColumnName = "";
 
@@ -247,7 +227,7 @@ export async function POST(req: NextRequest) {
     const imageColumnName =
       headers.find((header) =>
         ["Images", "Image", "Image Src", "image", "images"].includes(header)
-      ) || "Images";
+      ) || "Image";
 
     // Set up Google Sheets client if credentials are available
     let sheets: sheets_v4.Sheets | null = null;
@@ -300,8 +280,8 @@ export async function POST(req: NextRequest) {
 
         // Prepare slug-to-row mapping for efficient updating
         slugToRowMap = new Map<string, number>();
-        products.forEach((product, index) => {
-          const slug = product.Slug;
+        collections.forEach((collection, index) => {
+          const slug = collection.Slug;
           if (slug && !slugToRowMap.has(slug)) {
             // +2 because: 1 for 0-based to 1-based, and 1 for header row
             slugToRowMap.set(slug, index + 2);
@@ -317,60 +297,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate descriptions for each unique product (not each variant)
+    // Generate descriptions for each collection
     let processedCount = 0;
     let generatedCount = 0;
     let updatedInSheetCount = 0;
 
-    // Use Array.from to convert Map entries to array for iteration
-    const productEntries = Array.from(productGroups.entries());
-
-    // Process all products
-    for (const [slug, variants] of productEntries) {
+    // Process all collections
+    for (const collection of collections) {
       try {
-        // Use the first variant for product details
-        const product = variants[0];
+        // Check if this collection already has a description
+        const slug = collection.Slug;
+        if (!slug) continue; // Skip if no slug
 
-        // Check if this product already has a description
-        const existingDescription = product[descColumnName]?.trim();
+        const title = collection.Title || collection.Name || slug;
+        const existingDescription = collection[descColumnName]?.trim();
         const existingShortDescription = generateShortDesc
-          ? product[shortDescColumnName]?.trim()
+          ? collection[shortDescColumnName]?.trim()
           : "";
 
         // Extract metadata fields for more detailed descriptions
         const metadata: Record<string, any> = {};
 
         // Add relevant metadata fields if they exist
-        Object.keys(product).forEach((key) => {
-          if (key.startsWith("Metadata:") && product[key]) {
+        Object.keys(collection).forEach((key) => {
+          if (key.startsWith("Metadata:") && collection[key]) {
             const metadataKey = key.replace("Metadata:", "").trim();
-            metadata[metadataKey] = product[key];
+            metadata[metadataKey] = collection[key];
           }
         });
 
-        // Collect all unique images from all variants
-        const allProductImages: string[] = [];
+        // Add product count if available
+        if (collection["Product Count"]) {
+          metadata.product_count = collection["Product Count"];
+        }
 
-        variants.forEach((variant) => {
-          const variantImages = extractImages(variant[imageColumnName]);
-          if (variantImages.length > 0) {
-            // For each variant, we only take the first image if it's not already in our collection
-            const firstImage = variantImages[0];
-            if (!allProductImages.includes(firstImage)) {
-              allProductImages.push(firstImage);
-            }
-          }
-        });
-
-        // Add images to metadata
-        if (allProductImages.length > 0) {
-          metadata.images = allProductImages;
-
-          // Set the main image (first one) separately
-          metadata.main_image = allProductImages[0];
-
-          // Include image count
-          metadata.image_count = allProductImages.length;
+        // Collect images
+        const collectionImages = extractImages(collection[imageColumnName]);
+        if (collectionImages.length > 0) {
+          metadata.images = collectionImages;
+          metadata.main_image = collectionImages[0];
+          metadata.image_count = collectionImages.length;
         }
 
         let enhancedDescription = existingDescription;
@@ -381,48 +347,48 @@ export async function POST(req: NextRequest) {
         // Generate description only if it doesn't exist or force update is enabled
         if (!existingDescription || forceUpdate) {
           console.log(
-            `Generating description for "${product.Name}" (${slug}) with ${allProductImages.length} images`
+            `Generating description for "${title}" (${slug}) collection`
           );
 
           // Generate enhanced description
-          enhancedDescription = await generateProductDescription({
-            title: product.Name || "",
-            category: product["Category - Name"] || "",
+          enhancedDescription = await generateCollectionDescription({
+            title: title,
+            productCount: metadata.product_count,
             metadata,
           });
 
           // Store the enhanced description with slug as key
-          productDescriptions.set(slug, enhancedDescription);
+          collectionDescriptions.set(slug, enhancedDescription);
           newFullDesc = enhancedDescription;
           needsUpdate = true;
         } else {
           console.log(
-            `Skipping description for ${product.Name} (already exists)`
+            `Skipping description for ${title} collection (already exists)`
           );
         }
 
         // Generate short description if the column exists and it doesn't already have a value
         if (generateShortDesc && (!existingShortDescription || forceUpdate)) {
           console.log(
-            `Generating short description for "${product.Name}" (${slug})`
+            `Generating short description for "${title}" (${slug}) collection`
           );
 
-          const shortDescription = await generateShortProductDescription(
+          const shortDescription = await generateShortCollectionDescription(
             {
-              title: product.Name || "",
-              category: product["Category - Name"] || "",
+              title: title,
+              productCount: metadata.product_count,
               metadata,
             },
             enhancedDescription
           );
 
           // Store the short description with slug as key
-          shortProductDescriptions.set(slug, shortDescription);
+          shortCollectionDescriptions.set(slug, shortDescription);
           newShortDesc = shortDescription;
           needsUpdate = true;
         } else if (generateShortDesc && existingShortDescription) {
           console.log(
-            `Skipping short description for ${product.Name} (already exists)`
+            `Skipping short description for ${title} collection (already exists)`
           );
         }
 
@@ -450,78 +416,81 @@ export async function POST(req: NextRequest) {
           generatedCount++;
         }
       } catch (error) {
-        console.error(`Error processing product ${slug}:`, error);
+        console.error(`Error processing collection ${collection.Slug}:`, error);
       }
     }
 
     console.log(
-      `Processed ${processedCount} products, generated ${generatedCount} descriptions, updated ${updatedInSheetCount} in spreadsheet`
+      `Processed ${processedCount} collections, generated ${generatedCount} descriptions, updated ${updatedInSheetCount} in spreadsheet`
     );
 
     // If no descriptions were generated, return early
-    if (productDescriptions.size === 0 && shortProductDescriptions.size === 0) {
+    if (
+      collectionDescriptions.size === 0 &&
+      shortCollectionDescriptions.size === 0
+    ) {
       return NextResponse.json({
         success: true,
         message: "No new descriptions needed to be generated",
-        totalProducts: products.length,
-        uniqueProducts: productGroups.size,
+        totalCollections: collections.length,
         generatedDescriptions: 0,
         updatedInSpreadsheet: 0,
       });
     }
 
-    // Update all products in the original array with their enhanced descriptions
-    const updatedProducts = products.map((product) => {
-      const slug = product.Slug;
-      const enhancedDescription = productDescriptions.get(slug);
-      const shortDescription = shortProductDescriptions.get(slug);
+    // Update all collections in the original array with their enhanced descriptions
+    const updatedCollections = collections.map((collection) => {
+      const slug = collection.Slug;
+      const enhancedDescription = collectionDescriptions.get(slug);
+      const shortDescription = shortCollectionDescriptions.get(slug);
 
       if (enhancedDescription || shortDescription) {
-        const updatedProduct = { ...product };
+        const updatedCollection = { ...collection };
 
         if (enhancedDescription) {
-          updatedProduct[descColumnName] = enhancedDescription;
+          updatedCollection[descColumnName] = enhancedDescription;
         }
 
         // Add short description if it exists
         if (generateShortDesc && shortDescription) {
-          updatedProduct[shortDescColumnName] = shortDescription;
+          updatedCollection[shortDescColumnName] = shortDescription;
         }
 
-        return updatedProduct;
+        return updatedCollection;
       }
 
-      return product;
+      return collection;
     });
 
     return NextResponse.json({
       success: true,
-      message: "Product descriptions generated and updated successfully",
-      totalProducts: products.length,
-      uniqueProducts: productGroups.size,
-      generatedDescriptions: productDescriptions.size,
-      generatedShortDescriptions: shortProductDescriptions.size,
+      message: "Collection descriptions generated and updated successfully",
+      totalCollections: collections.length,
+      generatedDescriptions: collectionDescriptions.size,
+      generatedShortDescriptions: shortCollectionDescriptions.size,
       updatedInSpreadsheet: updatedInSheetCount,
-      updatedProducts: Array.from(productDescriptions.entries()).map(
+      updatedCollections: Array.from(collectionDescriptions.entries()).map(
         ([slug, description]) => {
-          const product = products.find((p) => p.Slug === slug);
+          const collection = collections.find((c) => c.Slug === slug);
           return {
             slug,
-            name: product?.Name || slug,
+            title: collection?.Title || collection?.Name || slug,
             description,
-            shortDescription: shortProductDescriptions.get(slug) || "",
-            images: product ? extractImages(product[imageColumnName]) : [],
+            shortDescription: shortCollectionDescriptions.get(slug) || "",
+            images: collection
+              ? extractImages(collection[imageColumnName])
+              : [],
             updatedInSheet: updatedSlugs.has(slug),
           };
         }
       ),
     });
   } catch (error: any) {
-    console.error("Error in generate products description API:", error);
+    console.error("Error in generate collections description API:", error);
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to generate product descriptions",
+        message: "Failed to generate collection descriptions",
         error: error.message,
       },
       { status: 500 }

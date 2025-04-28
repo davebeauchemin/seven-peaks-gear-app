@@ -334,7 +334,7 @@ export async function deleteAllProductData() {
 export async function createSureCartProductPrice(
   productId: string,
   amount: number,
-  name: string = "Fallback Pricing"
+  name: string | null = null
 ): Promise<any> {
   console.log(
     `Creating fallback price for product ${productId} with amount ${amount} cents`
@@ -395,6 +395,16 @@ export function formatProductsForSureCart(
       console.log(
         `Generated slug "${formattedSlug}" from name "${firstItem.Name}" and category "${firstItem["Category - Name"]}"`
       );
+    }
+
+    // Check if product should be featured
+    let isFeatured = false;
+    if (firstItem.Featured !== undefined) {
+      // Convert "true", "yes", "1" strings to boolean true
+      isFeatured = ["true", "yes", "1"].includes(
+        String(firstItem.Featured).toLowerCase()
+      );
+      console.log(`Product ${firstItem.Name} featured status: ${isFeatured}`);
     }
 
     // Collect metadata from all fields that start with 'Metadata:' (using first item)
@@ -476,7 +486,7 @@ export function formatProductsForSureCart(
             (firstItem["Category - Name"]
               ? `${firstItem.Name} ${firstItem["Category - Name"]}`
               : firstItem.Name),
-          featured: false,
+          featured: isFeatured,
           name: firstItem.Name,
           status: "published",
           slug: formattedSlug,
@@ -601,7 +611,7 @@ export function formatProductsForSureCart(
           (firstItem["Category - Name"]
             ? `${firstItem.Name} ${firstItem["Category - Name"]}`
             : firstItem.Name),
-        featured: false,
+        featured: isFeatured,
         name: firstItem.Name,
         status: "published",
         slug: formattedSlug,

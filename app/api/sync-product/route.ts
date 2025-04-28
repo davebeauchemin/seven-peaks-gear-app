@@ -32,6 +32,30 @@ function buildSheetsUrl(sheetId: string, gid: string): string {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
 }
 
+// Interface for sheet source definition
+interface SheetSource {
+  sheetId: string;
+  gid: string;
+}
+
+// Parse sheet sources from string or array format
+function parseSheetSources(
+  sources: string | SheetSource[] | undefined
+): SheetSource[] {
+  if (!sources) return [];
+
+  if (typeof sources === "string") {
+    try {
+      return JSON.parse(sources) as SheetSource[];
+    } catch (error) {
+      console.error("Failed to parse sheet sources string:", error);
+      return [];
+    }
+  }
+
+  return sources;
+}
+
 // Collection item type from CSV
 export interface CollectionCSVItem {
   "": string;
@@ -249,35 +273,101 @@ export async function POST(req: NextRequest) {
     const {
       sheetId,
       gid,
+      sheetSources,
       csvUrl,
       deleteExisting = false,
+      deleteAll = false, // New parameter to delete all products and collections
     } = await req.json().catch(() => ({}));
 
-    // Only delete existing products if deleteExisting is true
-    if (deleteExisting) {
-      console.log("Deleting existing data as requested...");
+    // If deleteAll is specified, first delete all products and collections
+    if (deleteAll) {
+      console.log("Deleting ALL products and collections as requested...");
+
+      // First delete all collections via the sync-collections DELETE endpoint
+      console.log("Deleting all collections first...");
+      try {
+        // Ensure we have the full URL with proper origin
+        const baseUrl =
+          process.env.NEXT_PUBLIC_APP_URL ||
+          (typeof window !== "undefined"
+            ? window.location.origin
+            : "http://localhost:3000");
+
+        const syncCollectionsResponse = await fetch(
+          `${baseUrl}/api/sync-collections?all=true`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!syncCollectionsResponse.ok) {
+          const error = await syncCollectionsResponse.json();
+          console.error("Error deleting collections:", error);
+          throw new Error(
+            `Failed to delete collections: ${error.message || syncCollectionsResponse.statusText}`
+          );
+        }
+
+        const collectionsResult = await syncCollectionsResponse.json();
+        console.log(
+          `Collections deletion completed: ${collectionsResult.summary?.deleted || 0} collections deleted`
+        );
+      } catch (collectionError: any) {
+        console.error("Failed to delete collections:", collectionError.message);
+        throw new Error(
+          `Failed to delete collections: ${collectionError.message}`
+        );
+      }
+
+      // Then delete all products
       await deleteAllSureCartProducts();
       await deleteAllProductVariants();
-      console.log("Existing data deleted successfully");
+      console.log("All products and variants deleted successfully");
+
+      // Now call the sync-collections endpoint to recreate collections
+      console.log("Creating collections before products...");
+      try {
+        const baseUrl =
+          process.env.NEXT_PUBLIC_APP_URL ||
+          (typeof window !== "undefined"
+            ? window.location.origin
+            : "http://localhost:3000");
+
+        const syncCollectionsResponse = await fetch(
+          `${baseUrl}/api/sync-collections`,
+          {
+            method: "POST",
+          }
+        );
+
+        if (!syncCollectionsResponse.ok) {
+          const error = await syncCollectionsResponse.json();
+          console.error("Error syncing collections:", error);
+          throw new Error(
+            `Failed to sync collections: ${error.message || syncCollectionsResponse.statusText}`
+          );
+        }
+
+        const collectionsResult = await syncCollectionsResponse.json();
+        console.log(
+          `Collections sync completed: ${collectionsResult.summary?.totalCollections || 0} collections created`
+        );
+      } catch (collectionError: any) {
+        console.error("Failed to sync collections:", collectionError.message);
+        throw new Error(
+          `Failed to sync collections before products: ${collectionError.message}`
+        );
+      }
+    }
+    // Only delete existing products if deleteExisting is true (but not deleting collections)
+    else if (deleteExisting) {
+      console.log("Deleting existing products only as requested...");
+      await deleteAllSureCartProducts();
+      await deleteAllProductVariants();
+      console.log("Existing products deleted successfully");
     } else {
       console.log(
         "Skipping deletion of existing products (deleteExisting=false)"
-      );
-    }
-
-    // Determine the CSV source - prefer provided CSV URL, then built URL from sheetId/gid, then env variable
-    let dataSourceUrl: string;
-
-    if (csvUrl) {
-      dataSourceUrl = csvUrl;
-      console.log(`Using provided CSV URL: ${dataSourceUrl}`);
-    } else if (sheetId && gid) {
-      dataSourceUrl = buildSheetsUrl(sheetId, gid);
-      console.log(`Using Google Sheet: ${dataSourceUrl}`);
-    } else {
-      dataSourceUrl = process.env.PRODUCTS_FILE_URL!;
-      console.log(
-        `Using default products URL from environment: ${dataSourceUrl}`
       );
     }
 
@@ -303,25 +393,88 @@ export async function POST(req: NextRequest) {
         console.log(`  - ${slug}`);
       });
 
-    // Fetch and process product data
-    console.log("Fetching and processing product data...");
-    const productData = (await fetchCSVData(dataSourceUrl)) as ProductCSVItem[];
-    console.log(`Loaded ${productData.length} product variants from CSV`);
+    // Fetch and process product data from all sources
+    console.log("Determining product data sources...");
+
+    // Initialize an array to hold all product data
+    let allProductData: ProductCSVItem[] = [];
+
+    // Parse sheet sources if provided
+    const sources = parseSheetSources(sheetSources);
+
+    if (csvUrl) {
+      // Use single CSV URL if provided
+      console.log(`Using provided CSV URL: ${csvUrl}`);
+      const productData = (await fetchCSVData(csvUrl)) as ProductCSVItem[];
+      console.log(`Loaded ${productData.length} product variants from CSV URL`);
+      allProductData = [...allProductData, ...productData];
+    } else if (sources.length > 0) {
+      // Use multiple sheet sources
+      console.log(`Processing ${sources.length} sheet sources`);
+
+      for (let i = 0; i < sources.length; i++) {
+        const { sheetId: srcSheetId, gid: srcGid } = sources[i];
+        const sourceUrl = buildSheetsUrl(srcSheetId, srcGid);
+        console.log(
+          `[${i + 1}/${sources.length}] Fetching from Google Sheet: ${sourceUrl}`
+        );
+
+        try {
+          const productData = (await fetchCSVData(
+            sourceUrl
+          )) as ProductCSVItem[];
+          console.log(
+            `Loaded ${productData.length} product variants from source ${i + 1}`
+          );
+          allProductData = [...allProductData, ...productData];
+        } catch (error: any) {
+          console.error(
+            `Error loading data from source ${i + 1}:`,
+            error.message
+          );
+          // Continue with other sources even if one fails
+        }
+      }
+    } else if (sheetId && gid) {
+      // Fallback to single sheetId/gid for backward compatibility
+      const sourceUrl = buildSheetsUrl(sheetId, gid);
+      console.log(`Using single Google Sheet: ${sourceUrl}`);
+      const productData = (await fetchCSVData(sourceUrl)) as ProductCSVItem[];
+      console.log(
+        `Loaded ${productData.length} product variants from single sheet`
+      );
+      allProductData = [...allProductData, ...productData];
+    } else {
+      // Use default URL from environment
+      const defaultUrl = process.env.PRODUCTS_FILE_URL!;
+      console.log(`Using default products URL from environment: ${defaultUrl}`);
+      const productData = (await fetchCSVData(defaultUrl)) as ProductCSVItem[];
+      console.log(
+        `Loaded ${productData.length} product variants from default URL`
+      );
+      allProductData = [...allProductData, ...productData];
+    }
+
+    console.log(`Total product variants loaded: ${allProductData.length}`);
+
+    if (allProductData.length === 0) {
+      throw new Error("No product data was loaded from any source");
+    }
 
     // Debug: Log unique category slugs from CSV
     const uniqueCategorySlugs = new Set<string>();
     console.log("Raw CSV data sample:");
-    console.log(JSON.stringify(productData[0], null, 2)); // Log first item to see structure
+    console.log(JSON.stringify(allProductData[0], null, 2)); // Log first item to see structure
 
     // Log all keys to debug
     const allKeys = new Set<string>();
-    productData.forEach((item) => {
+    allProductData.forEach((item) => {
       Object.keys(item).forEach((key) => allKeys.add(key));
     });
     console.log("Available CSV columns:", Array.from(allKeys).join(", "));
 
     // Now process category slugs
-    productData.forEach((item) => {
+    allProductData.forEach((item) => {
       if (item["Category - Slugs"]) {
         console.log(
           `Found Category - Slugs for ${item.Name}: "${item["Category - Slugs"]}"`
@@ -411,7 +564,7 @@ export async function POST(req: NextRequest) {
     const productCollectionMap = new Map<string, string[]>();
 
     // First pass: extract all collection slugs for each product
-    productData.forEach((item) => {
+    allProductData.forEach((item) => {
       const collectionIds: string[] = [];
 
       // First try to get from Category - Slugs
@@ -540,7 +693,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Format the products for SureCart
-    const formattedProducts = formatProductsForSureCart(productData);
+    const formattedProducts = formatProductsForSureCart(allProductData);
 
     // Second pass: add collection IDs to formatted products
     formattedProducts.forEach(({ product }) => {
@@ -970,8 +1123,8 @@ export async function POST(req: NextRequest) {
       // Find the product's category slugs from the original data
       // First try to find by name which is more reliable with the new slug format
       const originalProductData =
-        productData.find((p) => p.Name === product.name) ||
-        productData.find(
+        allProductData.find((p) => p.Name === product.name) ||
+        allProductData.find(
           (p) => p.Slug === product.slug // Fallback to slug if name doesn't match
         );
 
@@ -1182,9 +1335,13 @@ export async function POST(req: NextRequest) {
         uploadedImages: imageUrlsToUpload.length,
         dataSource: csvUrl
           ? "custom_csv_url"
-          : sheetId && gid
-            ? `google_sheet_${sheetId}`
-            : "default_env_config",
+          : sheetSources
+            ? `multiple_sheets_${sources.length}`
+            : sheetId && gid
+              ? `google_sheet_${sheetId}`
+              : "default_env_config",
+        totalSources:
+          sources.length || (sheetId && gid ? 1 : 0) || (csvUrl ? 1 : 0) || 1,
         deleteExisting,
         collectionErrors: collectionErrors.length,
         errorLogFile,
@@ -1366,6 +1523,10 @@ async function fetchAllExistingMedia(): Promise<
 export async function DELETE(req: NextRequest) {
   console.log("Starting complete product data deletion process...");
 
+  // Get parameters from request
+  const { searchParams } = new URL(req.url);
+  const deleteAllData = searchParams.get("deleteAll") === "true";
+
   // Delete all products
   console.log("Deleting all products...");
   const productsResult = await deleteAllSureCartProducts();
@@ -1374,9 +1535,49 @@ export async function DELETE(req: NextRequest) {
   console.log("Deleting all product variants...");
   const variantsResult = await deleteAllProductVariants();
 
-  // Delete all product collections
-  console.log("Deleting all product collections...");
-  const collectionsResult = await deleteAllProductCollections();
+  // Initialize with defaults compatible with deleteAllProductCollections's return type
+  let collectionsSuccess = false;
+  let collectionsCount = 0;
+
+  // If deleteAllData is true, also delete collections via the sync-collections endpoint
+  if (deleteAllData) {
+    console.log("Deleting all collections via sync-collections endpoint...");
+    try {
+      // Ensure we have the full URL with proper origin
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== "undefined"
+          ? window.location.origin
+          : "http://localhost:3000");
+
+      const syncCollectionsResponse = await fetch(
+        `${baseUrl}/api/sync-collections?all=true`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!syncCollectionsResponse.ok) {
+        const error = await syncCollectionsResponse.json();
+        console.error("Error deleting collections:", error);
+      } else {
+        const result = await syncCollectionsResponse.json();
+        console.log(
+          `Collections deletion completed: ${result.summary?.deleted || 0} collections deleted`
+        );
+        collectionsSuccess = result.success || false;
+        collectionsCount = result.summary?.deleted || 0;
+      }
+    } catch (collectionError: any) {
+      console.error("Failed to delete collections:", collectionError.message);
+    }
+  } else {
+    // Only delete collections if not using the sync-collections endpoint
+    console.log("Deleting all product collections via direct API call...");
+    const collectionsResult = await deleteAllProductCollections();
+    collectionsSuccess = collectionsResult.success || false;
+    collectionsCount = collectionsResult.count || 0;
+  }
 
   return NextResponse.json({
     success: true,
@@ -1384,8 +1585,9 @@ export async function DELETE(req: NextRequest) {
     details: {
       products: productsResult.success,
       variants: variantsResult.success,
-      collections: collectionsResult.success,
-      collectionsDeleted: collectionsResult.count || 0,
+      collections: collectionsSuccess,
+      collectionsDeleted: collectionsCount,
+      deletedAllData: deleteAllData,
     },
   });
 }
